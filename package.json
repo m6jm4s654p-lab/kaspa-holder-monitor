@@ -1,6 +1,6 @@
 {
   "name": "kaspa-holder-monitor-techbit",
-  "version": "1.2.0",
+  "version": "1.5.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -8,8 +8,9 @@
     "start": "next start"
   },
   "dependencies": {
-    "next": "^16.3.4",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8"
-  }
+    "next": "15.5.2",
+    "react": "19.1.1",
+    "react-dom": "19.1.1"
+  },
+  "devDependencies": {}
 }
