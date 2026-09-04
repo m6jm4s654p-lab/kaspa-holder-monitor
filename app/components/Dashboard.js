@@ -137,6 +137,5 @@ export default function Dashboard(){
   <section className="card"><div className="chartHead"><b>{t.compare}</b><span>{period===365?'1Y':`${period}D`}</span></div><NormalizedCompare holderValues={h100} priceValues={priceSeries} t={t}/></section>
   <section className="card signalCard"><div><div className="eyebrow">{t.signal}</div><strong>{signal}</strong></div><div className="scoreNum">{score??'—'}<small>{score==null?'':'/100'}</small></div></section>
   <footer><div className="footerBrand"><img src="/kaspa-logo.svg" alt="Kaspa"/><div><b>@TechBit</b><span>KASPA ON-CHAIN ANALYTICS</span></div></div><p>{t.foot}</p><p>{t.source}: Kaspatrol / api.kaspa.org · CoinGecko<br/>{t.updated}: {holder?.capturedAt?new Date(holder.capturedAt).toLocaleString(lang==='ja'?'ja-JP':'en-US'):'—'}</p></footer>
-  <nav><button className="active">⌂<span>{t.home}</span></button><button>▥<span>{t.charts}</span></button><button>♟<span>{t.holders}</span></button><button>♢<span>{t.alerts}</span></button><button>•••<span>{t.more}</span></button></nav>
- </main>
+</main>
 }
