@@ -2,8 +2,23 @@
   "name": "KASPA Holder Monitor by @TechBit",
   "short_name": "KAS Monitor",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#02100e",
   "theme_color": "#49eac1",
-  "description": "Kaspa holder distribution and on-chain trend monitor by @TechBit"
+  "description": "Kaspa holder distribution and on-chain trend monitor by @TechBit",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
 }

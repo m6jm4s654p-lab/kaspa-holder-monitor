@@ -5,6 +5,7 @@ export const metadata = {
   title: 'KASPA Holder Monitor | @TechBit',
   description: 'KASPAのHolder動向、クジラ集中度、価格データを実データで可視化するオンチェーン分析ダッシュボード。',
   applicationName: 'KASPA Holder Monitor',
+  manifest: '/manifest.webmanifest',
   authors: [{ name: '@TechBit' }],
   creator: '@TechBit',
   publisher: '@TechBit',
@@ -37,7 +38,14 @@ export const metadata = {
     follow: true
   },
   icons: {
-    icon: '/kaspa-logo.svg'
+    icon: [
+      { url: '/favicon-64.png', type: 'image/png', sizes: '64x64' },
+      { url: '/kaspa-logo.svg', type: 'image/svg+xml' }
+    ],
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }
+    ],
+    shortcut: '/favicon-64.png'
   }
 };
 
