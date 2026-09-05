@@ -31,3 +31,40 @@
 .subStat{margin-top:9px;padding-top:8px;border-top:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:space-between;gap:8px}
 .subStat span{font-size:9px;color:#789b92}
 .subStat b{font-size:13px;color:#bdf8e8;font-variant-numeric:tabular-nums}
+
+/* v1.9: moving averages and refresh health */
+.maLine{stroke-width:1.45;stroke-linecap:round;stroke-linejoin:round;pointer-events:none;filter:drop-shadow(0 0 1px rgba(0,0,0,.65))}
+.maLegend{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin:1px 0 8px}
+.maLegend button{min-width:0;border:1px solid #ffffff14;border-radius:8px;background:#071a17;color:#819c96;padding:6px 4px;display:flex;align-items:center;justify-content:center;gap:4px;font-size:8px;cursor:pointer;opacity:.48}
+.maLegend button.active{color:#e9f6f3;border-color:#ffffff25;opacity:1}
+.maLegend button.unavailable{cursor:default;opacity:.34;flex-wrap:wrap}
+.maLegend button i{display:block;width:11px;height:2px;border-radius:99px;flex:0 0 auto}
+.maLegend button b{font-size:8px;white-space:nowrap}
+.maLegend button span{width:100%;font-size:6px;color:#7b918c;white-space:nowrap}
+.updateStatus{display:flex;align-items:center;gap:8px;margin-top:6px;padding-top:6px;border-top:1px solid #ffffff0b;color:#6f928a;font-size:8px;font-variant-numeric:tabular-nums}
+.updateStatus b{margin-left:auto;color:#70cbb4;font-size:8px}
+.updateStatus.delayed b{color:#ff9b70}
+
+/* v2.0: fixed 4-hour scroll chart and desktop dashboard */
+.fixedTimeframe{display:flex;flex-direction:column;align-items:flex-end;gap:2px;border:1px solid rgba(73,234,193,.3);background:#09231f;border-radius:10px;padding:7px 10px}
+.fixedTimeframe b{color:var(--kas);font-size:14px;line-height:1}.fixedTimeframe span{color:#74968e;font-size:7px;white-space:nowrap}
+.latestButton{margin-left:auto;border:1px solid #49eac13d;background:#0b332c;color:#9ff6de;border-radius:7px;padding:4px 8px;font-size:8px;font-weight:800;cursor:pointer}
+.chartMode .latestButton+em{margin-left:0}
+.marketScroller{width:100%;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;scrollbar-width:thin;scrollbar-color:#247d69 #061613;border-radius:10px;background:#041512;cursor:grab;user-select:none}
+.marketScroller:active{cursor:grabbing}
+.marketScroller::-webkit-scrollbar{height:7px}.marketScroller::-webkit-scrollbar-track{background:#061613}.marketScroller::-webkit-scrollbar-thumb{background:#247d69;border-radius:99px}
+.marketScroller .marketChart{max-width:none;touch-action:pan-x}
+
+@media(min-width:900px){
+ body{background:radial-gradient(circle at 50% -12%,rgba(73,234,193,.18),transparent 34%),linear-gradient(#041512,#020b0a 72%)}
+ .shell{width:100%;max-width:1400px;padding:12px 24px 42px;display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-template-rows:auto auto auto auto auto auto auto;gap:12px;align-items:stretch}
+ .shell>.topbar{grid-column:1/-1;grid-row:1}.shell>.hero{grid-column:1/-1;grid-row:2;padding:4px 3px 2px}
+ .shell>.priceCard{grid-column:1/9;grid-row:3/span 2}.shell>.overviewGrid{grid-column:9/13;grid-row:3}.shell>.supplyGrid{grid-column:9/13;grid-row:4}
+ .shell>.holderAnalysisCard{grid-column:1/5;grid-row:5}.shell>.tiersCard{grid-column:5/9;grid-row:5}.shell>.trendCard{grid-column:9/13;grid-row:5}
+ .shell>.dailyCard{grid-column:1/5;grid-row:6}.shell>.compareCard{grid-column:5/9;grid-row:6}.shell>.signalCard{grid-column:9/13;grid-row:6}
+ .shell>footer{grid-column:1/-1;grid-row:7}
+ .shell>.card,.shell>.statsGrid{margin:0}.priceCard{padding:18px}.marketChart{height:280px}.marketEmpty{height:280px}
+ .overviewGrid,.supplyGrid{gap:12px}.stat{height:100%;min-height:146px}.whaleCard{min-height:230px}
+ .topbar{padding:8px 2px}.hero h1{font-size:23px}.hero p{font-size:13px}.price{font-size:43px}
+ .chart{height:150px}.compareChart{height:165px}.tiersCard,.holderAnalysisCard,.trendCard,.dailyCard,.compareCard,.signalCard{min-height:100%}
+}

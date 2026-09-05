@@ -6,7 +6,7 @@ export async function GET(){
   return NextResponse.json({
     ok:true,
     app:'KASPA Holder Monitor',
-    version:'1.8.1',
+    version:'2.0.0',
     databaseConfigured:supabaseEnabled(),
     now:new Date().toISOString()
   },{headers:{'Cache-Control':'no-store'}});

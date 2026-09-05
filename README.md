@@ -1,11 +1,13 @@
-# KASPA Holder Monitor v1.2 · @TechBit
+# KASPA Holder Monitor v2.0 · @TechBit
 
-Mobile-first Kaspa on-chain analytics PWA built with Next.js / React.
+Responsive Kaspa on-chain analytics PWA built with Next.js / React.
 
 ## Main features
 - Official Kaspa logo and prominent @TechBit branding
 - Japanese / English switching
-- Live KAS/USD market chart and volume history
+- Fixed 4-hour KAS/USD chart with about 100 days of horizontal history
+- 10MA / 25MA / 75MA / 200MA overlays
+- Dedicated desktop dashboard and mobile layout
 - Holder distribution dashboard
 - 100K+ holder-address trend and daily change
 - Price vs holder-address comparison
