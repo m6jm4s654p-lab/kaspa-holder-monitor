@@ -53,6 +53,7 @@
 .marketCanvas{min-width:0;overflow:hidden}.marketCanvas .marketChart{width:100%;max-width:none;touch-action:pan-y}
 .fixedPriceAxis{display:block;width:58px;height:226px;background:#061a17;border-left:1px solid #ffffff16}
 .fixedPriceAxis .priceTag,.fixedPriceAxis .priceTagText,.candleUp .wick,.candleDown .wick,.candleUp .body,.candleDown .body,.volbar,.maLine,.realPriceLine,.closeDot{transition:all .2s ease}
+.currentPriceGuide{stroke:#49eac166;stroke-width:1;stroke-dasharray:3 3;pointer-events:none}
 
 /* v2.2: derivatives and rules-based market pulse */
 .table.hot{background:transparent;border-radius:0;padding-left:4px}
