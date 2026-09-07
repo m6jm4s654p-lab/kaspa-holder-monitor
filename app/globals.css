@@ -74,3 +74,5 @@
 }
 @media(max-width:390px){.marketChart,.fixedPriceAxis{height:205px}}
 @media(max-width:560px){.pulseSignals{grid-template-columns:1fr}.pulseSignals>div{padding:8px 9px}.pulseSummary{font-size:10px}.derivativesGrid b{font-size:11px}}
+/* v2.2.4 language selector */
+.lang{max-width:94px;padding:0 8px;cursor:pointer}
