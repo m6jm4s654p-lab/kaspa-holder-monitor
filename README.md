@@ -1,4 +1,4 @@
-# KASPA Holder Monitor v2.2 · @TechBit
+# KASPA Holder Monitor v2.2.1 · @TechBit
 
 Responsive Kaspa on-chain analytics PWA built with Next.js / React.
 
@@ -15,6 +15,8 @@ Responsive Kaspa on-chain analytics PWA built with Next.js / React.
 - Holder Trend Score after sufficient real history exists
 - PWA-ready mobile UI
 - Supabase daily snapshot storage
+- Rolling 120-day Holder history retention
+- Duplicate and fallback snapshot protection
 - Vercel Cron daily snapshot
 - `/api/health` deployment health endpoint
 

@@ -23,4 +23,4 @@ alter table public.holder_snapshots enable row level security;
 -- The browser never queries this table directly in this app.
 -- Only the Next.js server uses a Supabase secret key.
 revoke all on table public.holder_snapshots from anon, authenticated;
-grant select, insert on table public.holder_snapshots to service_role;
+grant select, insert, delete on table public.holder_snapshots to service_role;
