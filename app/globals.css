@@ -54,17 +54,22 @@
 .fixedPriceAxis{display:block;width:58px;height:226px;background:#061a17;border-left:1px solid #ffffff16}
 .fixedPriceAxis .priceTag,.fixedPriceAxis .priceTagText,.candleUp .wick,.candleDown .wick,.candleUp .body,.candleDown .body,.volbar,.maLine,.realPriceLine,.closeDot{transition:all .2s ease}
 
+/* v2.2: derivatives and rules-based market pulse */
+.table.hot{background:transparent;border-radius:0;padding-left:4px}
+.pulseCard{position:relative;overflow:hidden;border-color:#ffffff18}.pulseCard:before{content:"";position:absolute;inset:-100px -70px auto auto;width:230px;height:230px;border-radius:50%;background:radial-gradient(circle,rgba(73,234,193,.10),transparent 68%);pointer-events:none}.pulseCard.bull{border-color:#49eac150}.pulseCard.bear{border-color:#ff6b6b45}.pulseHead{display:flex;align-items:center;justify-content:space-between;gap:12px;position:relative}.pulseHead b{display:block;margin-top:4px;font-size:19px;color:#dffaf3}.pulseCard.bull .pulseHead b{color:var(--kas)}.pulseCard.bear .pulseHead b{color:#ff8585}.pulseHead>span{border:1px solid #ffffff17;border-radius:99px;padding:4px 7px;color:#71968d;font-size:7px;font-weight:800}.pulseSummary{position:relative;margin:12px 0;color:#c6dbd6;font-size:11px;line-height:1.6}.pulseSignals{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;position:relative}.pulseSignals>div,.derivativesGrid>div{min-width:0;border:1px solid #ffffff0d;border-radius:10px;background:#051816;padding:9px}.pulseSignals span,.derivativesGrid span{display:block;color:#6f9189;font-size:8px}.pulseSignals b{display:block;margin-top:4px;color:#d5e8e3;font-size:9px;line-height:1.45}.derivativesGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:7px;position:relative}.derivativesGrid b{display:block;margin-top:4px;font-size:14px;font-variant-numeric:tabular-nums}.pulseFoot{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-top:9px;padding-top:8px;border-top:1px solid #ffffff0b;color:#698a82;font-size:7px;line-height:1.4}.pulseFoot b{color:#80bbae;white-space:nowrap}
+
 @media(min-width:900px){
  body{background:radial-gradient(circle at 50% -12%,rgba(73,234,193,.18),transparent 34%),linear-gradient(#041512,#020b0a 72%)}
- .shell{width:100%;max-width:1400px;padding:12px 24px 42px;display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-template-rows:auto auto auto auto auto auto auto;gap:12px;align-items:stretch}
+ .shell{width:100%;max-width:1400px;padding:12px 24px 42px;display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-template-rows:repeat(8,auto);gap:12px;align-items:stretch}
  .shell>.topbar{grid-column:1/-1;grid-row:1}.shell>.hero{grid-column:1/-1;grid-row:2;padding:4px 3px 2px}
  .shell>.priceCard{grid-column:1/9;grid-row:3/span 2}.shell>.overviewGrid{grid-column:9/13;grid-row:3}.shell>.supplyGrid{grid-column:9/13;grid-row:4}
- .shell>.holderAnalysisCard{grid-column:1/5;grid-row:5}.shell>.tiersCard{grid-column:5/9;grid-row:5}.shell>.trendCard{grid-column:9/13;grid-row:5}
- .shell>.dailyCard{grid-column:1/5;grid-row:6}.shell>.compareCard{grid-column:5/9;grid-row:6}.shell>.signalCard{grid-column:9/13;grid-row:6}
- .shell>footer{grid-column:1/-1;grid-row:7}
+ .shell>.pulseCard{grid-column:1/-1;grid-row:5}.shell>.holderAnalysisCard{grid-column:1/5;grid-row:6}.shell>.tiersCard{grid-column:5/9;grid-row:6}.shell>.trendCard{grid-column:9/13;grid-row:6}
+ .shell>.dailyCard{grid-column:1/5;grid-row:7}.shell>.compareCard{grid-column:5/9;grid-row:7}.shell>.signalCard{grid-column:9/13;grid-row:7}
+ .shell>footer{grid-column:1/-1;grid-row:8}
  .shell>.card,.shell>.statsGrid{margin:0}.priceCard{padding:18px}.marketChart,.fixedPriceAxis{height:280px}.marketEmpty{height:280px}
  .overviewGrid,.supplyGrid{gap:12px}.stat{height:100%;min-height:146px}.whaleCard{min-height:230px}
  .topbar{padding:8px 2px}.hero h1{font-size:23px}.hero p{font-size:13px}.price{font-size:43px}
  .chart{height:150px}.compareChart{height:165px}.tiersCard,.holderAnalysisCard,.trendCard,.dailyCard,.compareCard,.signalCard{min-height:100%}
 }
 @media(max-width:390px){.marketChart,.fixedPriceAxis{height:205px}}
+@media(max-width:560px){.pulseSignals{grid-template-columns:1fr}.pulseSignals>div{padding:8px 9px}.pulseSummary{font-size:10px}.derivativesGrid b{font-size:11px}}

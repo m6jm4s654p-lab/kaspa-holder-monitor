@@ -3,7 +3,7 @@ import './globals.css';
 export const metadata = {
   metadataBase: new URL('https://kaspa-holder-monitor-five.vercel.app'),
   title: 'KASPA Holder Monitor | @TechBit',
-  description: 'KASPAのHolder動向、クジラ集中度、価格データを実データで可視化するオンチェーン分析ダッシュボード。',
+  description: 'KASPAのHolder動向、上位100アドレス保有比率、価格・先物データを実データで可視化する市場分析ダッシュボード。',
   applicationName: 'KASPA Holder Monitor',
   manifest: '/manifest.webmanifest',
   authors: [{ name: '@TechBit' }],
@@ -16,12 +16,12 @@ export const metadata = {
     url: 'https://kaspa-holder-monitor-five.vercel.app',
     siteName: 'KASPA Holder Monitor',
     title: 'KASPA Holder Monitor | @TechBit',
-    description: 'KASPAのHolder動向・クジラ集中度・価格データを実データで可視化。',
+    description: 'KASPAのHolder動向・上位100アドレス保有比率・価格・先物データを実データで可視化。',
     images: [
       {
-        url: '/og-kaspa-holder-monitor.png',
+        url: '/og-kaspa-holder-monitor-v2.png',
         width: 1200,
-        height: 630,
+        height: 675,
         alt: 'KASPA Holder Monitor by @TechBit'
       }
     ]
@@ -29,8 +29,8 @@ export const metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'KASPA Holder Monitor | @TechBit',
-    description: 'KASPAのHolder動向・クジラ集中度・価格データを実データで可視化。',
-    images: ['/og-kaspa-holder-monitor.png'],
+    description: 'KASPAのHolder動向・上位100アドレス保有比率・価格・先物データを実データで可視化。',
+    images: ['/og-kaspa-holder-monitor-v2.png'],
     creator: '@TechBit'
   },
   robots: {
