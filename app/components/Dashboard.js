@@ -121,7 +121,7 @@ function svgPath(values,x,y){
 function MarketChart({candles,prices,volumes,lang,t,displayDays=60}){
  const [hover,setHover]=useState(null);
  const [maVisible,setMaVisible]=useState(()=>Object.fromEntries(MA_CONFIG.map(ma=>[ma.period,true])));
- const W=720,H=244,AX=64,PL=8,PR=4,PT=14,PB=30,VH=48,FUTURE_SLOTS=10;
+ const W=720,H=244,AX=64,PL=8,PR=4,PT=14,PB=displayDays===30?18:30,VH=48,FUTURE_SLOTS=10;
  const hasCandles=Array.isArray(candles)&&candles.length>=2;
  const hasPrices=Array.isArray(prices)&&prices.length>=2;
  if(!hasCandles&&!hasPrices)return <div className="emptyChart marketEmpty"><div><b>{t.dataUnavailable}</b><span>{t.realData}</span></div></div>;
@@ -164,7 +164,7 @@ function MarketChart({candles,prices,volumes,lang,t,displayDays=60}){
     <path d={fallbackPath} fill="none" className="realPriceLine" strokeWidth="2.4" strokeLinejoin="round" strokeLinecap="round"/>}
    {maLines.map(ma=>ma.available&&maVisible[ma.period]?<path key={ma.period} d={svgPath(ma.values,x,y)} fill="none" stroke={ma.color} className="maLine"/>:null)}
    <line x1={x(points.length-1)} y1={y(points.at(-1).close)} x2={W-PR} y2={y(points.at(-1).close)} className="currentPriceGuide"/>
-   {[0,Math.floor((points.length-1)/2),points.length-1].map((i,k)=><text key={k} x={x(i)} y={H-7} textAnchor={k===0?'start':k===2?'end':'middle'} className="axisText">{dateFmt.format(new Date(points[i].ts))}</text>)}
+   {[0,Math.floor((points.length-1)/2),points.length-1].map((i,k)=><text key={k} x={x(i)} y={H-(displayDays===30?4:7)} textAnchor={k===0?'start':k===2?'end':'middle'} className="axisText">{dateFmt.format(new Date(points[i].ts))}</text>)}
    <line x1={cx} y1={PT} x2={cx} y2={H-PB} className="cross"/>
    <circle cx={cx} cy={y(p.close)} r="3.5" className="closeDot"/>
   </svg>
@@ -229,7 +229,7 @@ export default function Dashboard(){
  const timeFmt=value=>value?new Date(value).toLocaleTimeString(LOCALES[lang],{hour:'2-digit',minute:'2-digit'}):'—',updateDelayed=priceDelayed||chartDelayed;
  const top10=Number(concentration.top10)||0,top100=Number(concentration.top100)||0,top1000=Number(concentration.top1000)||0,segments=[{label:t.top10,val:top10,cls:'seg10'},{label:t.top11_100,val:Math.max(0,top100-top10),cls:'seg100'},{label:t.top101_1000,val:Math.max(0,top1000-top100),cls:'seg1000'},{label:t.other,val:Math.max(0,100-top1000),cls:'segOther'}];
  return <main className="shell">
-  <header className="topbar"><div className="brandBlock"><img src="/kaspa-logo.svg" className="kaspaMark" alt="Kaspa"/><div><div className="kaspaWord">KASPA</div><div className="monitorWord">HOLDER MONITOR</div></div></div><div className="headerTools"><span className="versionBadge">v2.2.8</span><select className="lang" value={lang} onChange={changeLang} aria-label="Language"><option value="ja">日本語</option><option value="en">English</option><option value="ko">한국어</option><option value="zh">中文</option><option value="es">Español</option></select><img className="headerTechbitLogo" src="/techbit-logo.png" alt="TechBit · Crypto × Data × Future"/></div></header>
+  <header className="topbar"><div className="brandBlock"><img src="/kaspa-logo.svg" className="kaspaMark" alt="Kaspa"/><div><div className="kaspaWord">KASPA</div><div className="monitorWord">HOLDER MONITOR</div></div></div><div className="headerTools"><span className="versionBadge">v2.2.9</span><select className="lang" value={lang} onChange={changeLang} aria-label="Language"><option value="ja">日本語</option><option value="en">English</option><option value="ko">한국어</option><option value="zh">中文</option><option value="es">Español</option></select><img className="headerTechbitLogo" src="/techbit-logo.png" alt="TechBit · Crypto × Data × Future"/></div></header>
   <section className="hero"><div className="live"><i/> {t.live}</div><h1>{t.tag}</h1><p>Small Steps. A Bigger KASPA.</p></section>
   <section className="card priceCard"><div className="row"><div><div className="eyebrow">{t.price} (USD)</div><div className="price">{price?.usd?`$${price.usd.toFixed(price.usd<.1?5:3)}`:'—'}</div><div className={price?.change24h>=0?'up':'down'}>{price?.change24h!=null?pct(price.change24h):'—'} <span>24h</span></div></div><div className="fixedTimeframe"><b>4H</b><span>{marketDays===30?t.view30:t.view60}</span></div></div><MarketChart candles={allCandles} prices={allPrices} volumes={allVolumes} lang={lang} t={t} displayDays={marketDays}/><div className="marketStats"><div><span>{marketDays===30?t.change30Market:t.change60}</span><b className={periodChange>=0?'up':'down'}>{pct(periodChange)}</b></div><div><span>{t.high}</span><b>{periodHigh?`$${periodHigh.toFixed(5)}`:'—'}</b></div><div><span>{t.low}</span><b>{periodLow?`$${periodLow.toFixed(5)}`:'—'}</b></div><div><span>{t.volume}</span><b>{compactUsd(latestVol)}</b></div></div><div className="priceSource"><span className="realDot"/> {t.priceLive} · 4H OHLC · {t.realData}</div><div className={`updateStatus ${updateDelayed?'delayed':''}`}><span>{t.priceStatus} {timeFmt(priceUpdatedAt)}</span><span>{t.chartStatus} {timeFmt(chartUpdatedAt)}</span><b>{updateDelayed?t.updateDelayed:t.autoRefresh}</b></div></section>
   <section className={`card pulseCard ${pulse.tone}`}>
