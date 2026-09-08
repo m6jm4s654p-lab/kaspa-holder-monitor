@@ -96,3 +96,7 @@
 /* v2.2.10: make the mobile market chart about 1.2x taller */
 @media(max-width:560px){.marketChart,.fixedPriceAxis{height:271px}}
 @media(max-width:390px){.marketChart,.fixedPriceAxis{height:246px}}
+
+/* v2.2.11: remove mobile SVG letterboxing instead of enlarging the empty box */
+@media(max-width:560px){.marketChart,.fixedPriceAxis{height:226px}}
+@media(max-width:390px){.marketChart,.fixedPriceAxis{height:205px}}
