@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
-import { supabaseEnabled } from '@/lib/supabase';
+import { enforceRateLimit, NO_STORE } from '@/lib/api-security';
 
 export const dynamic='force-dynamic';
-export async function GET(){
+export async function GET(request){
+  const limited=enforceRateLimit(request,'health',30);
+  if(limited)return limited;
   return NextResponse.json({
     ok:true,
     app:'KASPA Holder Monitor',
-    version:'2.2.11',
-    databaseConfigured:supabaseEnabled(),
+    version:'2.2.12',
     now:new Date().toISOString()
-  },{headers:{'Cache-Control':'no-store'}});
+  },{headers:NO_STORE});
 }

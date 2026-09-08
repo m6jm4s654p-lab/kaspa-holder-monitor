@@ -1,4 +1,4 @@
-# KASPA Holder Monitor v2.2.11 · @TechBit
+# KASPA Holder Monitor v2.2.12 · @TechBit
 
 Responsive Kaspa on-chain analytics PWA built with Next.js / React.
 
@@ -19,12 +19,13 @@ Responsive Kaspa on-chain analytics PWA built with Next.js / React.
 - Duplicate and fallback snapshot protection
 - Vercel Cron daily snapshot
 - `/api/health` deployment health endpoint
+- Security headers, API burst protection, and sanitized public errors
 
 ## Production architecture
 
 `GitHub -> Vercel -> Next.js server APIs -> Supabase`
 
-The Supabase secret key is server-only. Never expose it via `NEXT_PUBLIC_*` or commit `.env.local`.
+The Supabase secret key and `CRON_SECRET` are server-only. Never expose them via `NEXT_PUBLIC_*` or commit `.env.local`.
 
 ## Local start
 
@@ -37,6 +38,6 @@ Open http://localhost:3000
 
 ## Database
 
-Run `supabase/schema.sql`, then configure `.env.local` from `.env.example`.
+For a new database, run `supabase/schema.sql`. When upgrading an existing installation, run `supabase/v2.2.12_security.sql` once. Then configure `.env.local` from `.env.example`.
 
 See `SETUP_GUIDE_JA.md` for the full Japanese GitHub / Vercel / Supabase deployment procedure.
