@@ -84,3 +84,11 @@
 .headerTechbitLogo{display:block;width:132px;height:auto;object-fit:contain;filter:drop-shadow(0 0 8px rgba(0,232,232,.16))}
 @media(max-width:390px){.topbar{grid-template-columns:minmax(0,1fr) 108px;gap:7px}.headerTools{width:108px;gap:5px}.headerTools .lang{width:86px;height:31px;font-size:11px}.headerTechbitLogo{width:108px}}
 @media(min-width:900px){.headerTools{width:158px}.headerTechbitLogo{width:158px}.headerTools .lang{width:100px}}
+
+/* v2.2.7 align both header brands along their bottom edge */
+.topbar{align-items:end}
+.brandBlock{align-self:end}
+
+/* v2.2.8 mobile version label */
+.versionBadge{display:none;color:#6f928a;font-size:9px;font-weight:800;letter-spacing:.7px;line-height:1}
+@media(max-width:560px){.versionBadge{display:block;margin-right:4px;margin-bottom:-1px}}
