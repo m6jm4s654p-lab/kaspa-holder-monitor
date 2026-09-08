@@ -92,3 +92,7 @@
 /* v2.2.8 mobile version label */
 .versionBadge{display:none;color:#6f928a;font-size:9px;font-weight:800;letter-spacing:.7px;line-height:1}
 @media(max-width:560px){.versionBadge{display:block;margin-right:4px;margin-bottom:-1px}}
+
+/* v2.2.10: make the mobile market chart about 1.2x taller */
+@media(max-width:560px){.marketChart,.fixedPriceAxis{height:271px}}
+@media(max-width:390px){.marketChart,.fixedPriceAxis{height:246px}}
