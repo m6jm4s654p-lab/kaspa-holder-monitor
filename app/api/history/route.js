@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseEnabled, supabaseRequest } from '@/lib/supabase';
+import { fetchHolderHistory } from '@/lib/holders';
 import { enforceRateLimit, NO_STORE, PUBLIC_CACHE_5M } from '@/lib/api-security';
 
 export const dynamic='force-dynamic';
@@ -20,9 +21,16 @@ export async function GET(request){
   const cutoff=new Date(Date.now()-days*24*60*60*1000).toISOString();
 
   try{
-    const newestFirst=await supabaseRequest(`holder_snapshots?select=${FIELDS}&captured_at=gte.${encodeURIComponent(cutoff)}&order=captured_at.desc&limit=${MAX_HISTORY_DAYS}`);
-    const rows=(newestFirst||[]).reverse();
-    return NextResponse.json({enabled:true,days,retentionDays:MAX_HISTORY_DAYS,rows},{headers:PUBLIC_CACHE_5M});
+    const [storedResult,kaspalyticsResult]=await Promise.allSettled([
+      supabaseRequest(`holder_snapshots?select=${FIELDS}&captured_at=gte.${encodeURIComponent(cutoff)}&order=captured_at.desc&limit=${MAX_HISTORY_DAYS}`),
+      fetchHolderHistory(Math.min(31,days+1))
+    ]);
+    if(storedResult.status==='rejected')throw storedResult.reason;
+    const stored=(storedResult.value||[]).reverse(),liveHistory=kaspalyticsResult.status==='fulfilled'?kaspalyticsResult.value:[];
+    if(kaspalyticsResult.status==='rejected')console.error('Kaspalytics history supplement failed',kaspalyticsResult.reason?.message||String(kaspalyticsResult.reason));
+    const firstLive=liveHistory[0]?.captured_at?new Date(liveHistory[0].captured_at).getTime():null;
+    const rows=[...stored.filter(row=>firstLive==null||new Date(row.captured_at).getTime()<firstLive),...liveHistory].filter(row=>new Date(row.captured_at)>=new Date(cutoff)).slice(-MAX_HISTORY_DAYS);
+    return NextResponse.json({enabled:true,days,retentionDays:MAX_HISTORY_DAYS,rows,supplementedDays:liveHistory.length},{headers:PUBLIC_CACHE_5M});
   }catch(error){
     console.error('History API failed',error);
     return NextResponse.json({enabled:true,days,retentionDays:MAX_HISTORY_DAYS,rows:[],error:'history_unavailable'},{status:503,headers:NO_STORE});
