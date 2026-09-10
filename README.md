@@ -1,4 +1,4 @@
-# KASPA Holder Monitor v2.2.14 · @TechBit
+# KASPA Holder Monitor v2.2.15 · @TechBit
 
 Responsive Kaspa on-chain analytics PWA built with Next.js / React.
 
