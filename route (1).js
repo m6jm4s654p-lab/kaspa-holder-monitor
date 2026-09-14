@@ -1,13 +1,10 @@
 import { NextResponse } from 'next/server';
-import { supabaseEnabled } from '@/lib/supabase';
-
-export const dynamic='force-dynamic';
-export async function GET(){
-  return NextResponse.json({
-    ok:true,
-    app:'KASPA Holder Monitor',
-    version:'2.2.11',
-    databaseConfigured:supabaseEnabled(),
-    now:new Date().toISOString()
-  },{headers:{'Cache-Control':'no-store'}});
+import { fetchKasPrice } from '@/lib/price';
+import { enforceRateLimit, PUBLIC_CACHE_1M } from '@/lib/api-security';
+export const revalidate=60;
+export async function GET(request){
+  const limited=enforceRateLimit(request,'price',120);
+  if(limited)return limited;
+  const {error,...price}=await fetchKasPrice();
+  return NextResponse.json(price,{headers:PUBLIC_CACHE_1M});
 }

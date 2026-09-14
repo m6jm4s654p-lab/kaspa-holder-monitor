@@ -2,7 +2,7 @@ const BYBIT_BASE='https://api.bybit.com';
 const SYMBOL='KASUSDT';
 
 async function fetchBybit(path){
-  const response=await fetch(`${BYBIT_BASE}${path}`,{next:{revalidate:300}});
+  const response=await fetch(`${BYBIT_BASE}${path}`,{cache:'no-store',headers:{accept:'application/json','user-agent':'KASPA-Holder-Monitor-TechBit/2.2.14'}});
   if(!response.ok)throw new Error(`Bybit ${response.status}`);
   const json=await response.json();
   if(json.retCode!==0)throw new Error(json.retMsg||`Bybit code ${json.retCode}`);
@@ -24,6 +24,8 @@ export async function fetchKasDerivatives(){
   const openInterest=Number(ticker?.openInterest);
   const openInterestUsd=Number(ticker?.openInterestValue);
   const fundingRate=Number(ticker?.fundingRate);
+  if(tickerResult.status==='rejected')console.error('Bybit ticker request failed',tickerResult.reason?.message||String(tickerResult.reason));
+  if(historyResult.status==='rejected')console.error('Bybit open-interest request failed',historyResult.reason?.message||String(historyResult.reason));
   return {
     available:Boolean(ticker||history.length),
     symbol:SYMBOL,

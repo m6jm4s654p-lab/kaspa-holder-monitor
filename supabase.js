@@ -22,7 +22,13 @@ export async function supabaseRequest(path, options={}){
     },
     cache:'no-store'
   });
-  if(!r.ok) throw new Error(`Supabase ${r.status}: ${await r.text()}`);
+  if(!r.ok){
+    const error=new Error(`Supabase request failed (${r.status})`);
+    error.status=r.status;
+    // Retain the response only for server-side diagnostics. API routes must not return it.
+    error.detail=await r.text();
+    throw error;
+  }
   const txt=await r.text();
   return txt?JSON.parse(txt):null;
 }

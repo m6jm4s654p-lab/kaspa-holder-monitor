@@ -1,95 +1,57 @@
-const FALLBACK = {
-  source: 'Kaspatrol / api.kaspa.org',
-  capturedAt: '2026-09-04T11:25:00.000Z',
-  total1Plus: 546653,
-  totalBalanceAddresses: null,
-  minBalanceKas: 0.0001,
-  circulating: 27680000000,
-  concentration: { top10: 25.26, top100: 40.33, top1000: 58.59 },
-  tiers: [
-    { key:'1b', min:1000000000, count:1 },
-    { key:'100m', min:100000000, count:15 },
-    { key:'10m', min:10000000, count:186 },
-    { key:'1m', min:1000000, count:2934 },
-    { key:'100k', min:100000, count:22297 },
-    { key:'10k', min:10000, count:66101 },
-    { key:'1k', min:1000, count:99891 },
-    { key:'100', min:100, count:100459 },
-    { key:'10', min:10, count:108652 },
-    { key:'1', min:1, count:146184 },
-    { key:'plankton', min:0.0001, count:241153 }
-  ]
-};
+const BASE='https://www.kaspalytics.com/api/charts/distribution/kas-threshold';
+const DISTRIBUTION_URL='https://www.kaspalytics.com/api/lists/kas-distribution';
+const TOP_ADDRESSES_URL='https://kaspa-lens.com/public-api/public/web/wallet/top-addresses?page=0&size=100';
+const THRESHOLDS=[['0.01+','0.01+'],['1+','1+'],['100+','100+'],['1K+','1k+'],['10K+','10k+'],['100K+','100k+'],['1M+','1m+'],['10M+','10m+'],['100M+','100m+'],['1B+','1b+']];
 
-function plain(html){return html.replace(/<script[\s\S]*?<\/script>/gi,' ').replace(/<style[\s\S]*?<\/style>/gi,' ').replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' ').replace(/&ge;|≥/g,'≥').replace(/\s+/g,' ')}
-function num(s){return Number(String(s).replace(/,/g,''))}
+async function fetchThreshold(key,path){
+  const response=await fetch(`${BASE}/${encodeURIComponent(path)}`,{next:{revalidate:300},headers:{accept:'application/json','user-agent':'KASPA-Holder-Monitor-TechBit/2.2.16'}});
+  if(!response.ok)throw new Error(`Kaspalytics ${response.status}`);
+  const json=await response.json(),labels=Array.isArray(json?.labels)?json.labels:[],addressSet=(json?.datasets||[]).find(x=>/address/i.test(x?.label||''))||json?.datasets?.[1],priceSet=(json?.datasets||[]).find(x=>/price/i.test(x?.label||''))||json?.datasets?.[0],values=addressSet?.data||[],prices=priceSet?.data||[];
+  const points=labels.map((capturedAt,index)=>({capturedAt,value:Number(values[index]),price:Number(prices[index])})).filter(x=>Number.isSafeInteger(x.value)&&x.value>=0&&Number.isFinite(new Date(x.capturedAt).getTime()));
+  if(!points.length)throw new Error('Kaspalytics distribution response invalid');
+  return {key,points};
+}
+
+async function fetchAll(){return Promise.all(THRESHOLDS.map(([key,path])=>fetchThreshold(key,path)))}
+async function fetchNetworkMetrics(){
+  const [distributionResponse,topResponse]=await Promise.all([
+    fetch(DISTRIBUTION_URL,{next:{revalidate:300},headers:{accept:'application/json','user-agent':'KASPA-Holder-Monitor-TechBit/2.2.17'}}),
+    fetch(TOP_ADDRESSES_URL,{next:{revalidate:300},headers:{accept:'application/json','X-Conversion-Currency':'USD','user-agent':'KASPA-Holder-Monitor-TechBit/2.2.17'}})
+  ]);
+  if(!distributionResponse.ok)throw new Error(`Kaspalytics distribution ${distributionResponse.status}`);
+  if(!topResponse.ok)throw new Error(`KasLens top addresses ${topResponse.status}`);
+  const distribution=await distributionResponse.json(),top=await topResponse.json(),addresses=Array.isArray(top?.content)?top.content:[];
+  const sompi=Number(distribution?.kasBucketTotals?.kaspa);
+  if(!Number.isFinite(sompi)||sompi<=0||addresses.length!==100||addresses.some((row,index)=>row.rank!==index+1||!Number.isFinite(Number(row.share))))throw new Error('Network metrics response invalid');
+  const share=count=>addresses.slice(0,count).reduce((total,row)=>total+Number(row.share),0);
+  return {circulating:sompi/1e8,concentration:{top10:share(10),top100:share(100),top1000:null}};
+}
+function validCounts(counts){
+  const ordered=['0.01+','1+','100+','1K+','10K+','100K+','1M+','10M+','100M+','1B+'];
+  return ordered.every(key=>Number.isSafeInteger(counts[key]))&&ordered.slice(1).every((key,index)=>counts[key]<=counts[ordered[index]]);
+}
+
+export async function fetchHolderHistory(days=30){
+  const sets=await fetchAll(),maps=Object.fromEntries(sets.map(set=>[set.key,new Map(set.points.map(point=>[point.capturedAt,point]))])),base=sets.find(set=>set.key==='100K+').points.slice(-Math.max(1,days));
+  return base.map(point=>{
+    const counts=Object.fromEntries(THRESHOLDS.map(([key])=>[key,maps[key].get(point.capturedAt)?.value]));
+    if(!validCounts(counts))return null;
+    return {captured_at:point.capturedAt,kas_price_usd:Number.isFinite(point.price)?point.price:null,total_1_plus:counts['1+'],a_100_plus:counts['100+'],a_1k_plus:counts['1K+'],a_10k_plus:counts['10K+'],a_100k_plus:counts['100K+'],a_1m_plus:counts['1M+'],a_10m_plus:counts['10M+'],a_100m_plus:counts['100M+'],top10_share:null,top100_share:null,top1000_share:null,circulating:null};
+  }).filter(Boolean);
+}
 
 export async function fetchHolderSnapshot(){
   try{
-    const r=await fetch('https://kaspatrol.com/addresses',{cache:'no-store',headers:{'user-agent':'KASPA-Holder-Monitor-TechBit/1.0'}});
-    if(!r.ok) throw new Error(`Kaspatrol ${r.status}`);
-    const text=plain(await r.text());
-    const totalMatch=text.match(/Addrs with\s*≥\s*1\s*KAS\s*([\d,]+)/i);
-    const circMatch=text.match(/Circulating\s*([\d.]+)B\s*KAS/i);
-    const top10=text.match(/Top 10 owns\s*[\d.]+B\s*([\d.]+)%/i);
-    const top100=text.match(/Top 100 owns\s*[\d.]+B\s*([\d.]+)%/i);
-    const top1000=text.match(/Top 1000 owns\s*[\d.]+B\s*([\d.]+)%/i);
-    const labels=[
-      ['1b',1000000000,'Aquaman'],['100m',100000000,'Humpback'],['10m',10000000,'Whale'],
-      ['1m',1000000,'Shark'],['100k',100000,'Dolphin'],['10k',10000,'Fish'],['1k',1000,'Octopus'],['100',100,'Crab'],['10',10,'Shrimp'],
-      ['1',1,'Oyster'],['plankton',0.0001,'Plankton']
-    ];
-    const tiers=labels.map(([key,min,label])=>{
-      const minText=String(min).replace('.', '\\.');
-      const prettyMin=Number.isInteger(min)?min.toLocaleString('en-US').replaceAll(',','[,]?'):minText;
-      const re=new RegExp(label+'\\s*'+prettyMin+'\\s*([\\d,]+)','i');
-      const m=text.match(re); return {key,min,count:m?num(m[1]):null};
-    });
-    if(!totalMatch || tiers.some(t=>t.count==null)) throw new Error('distribution parse failed');
-    const total1Plus=num(totalMatch[1]);
-
-    // Kaspatrol wealth tiers are mutually exclusive balance bands.
-    // Therefore the true balance-holding address total is the sum
-    // of every tier, not the sum of cumulative threshold figures.
-    const totalBalanceAddresses=tiers.reduce((sum,t)=>sum+t.count,0);
-
-    // Sanity check: all tiers at >=1 KAS should approximately match
-    // Kaspatrol's cumulative "Addrs with >= 1 KAS" figure.
-    const tierOnePlus=tiers
-      .filter(t=>t.min>=1)
-      .reduce((sum,t)=>sum+t.count,0);
-    if(Math.abs(tierOnePlus-total1Plus)>5){
-      throw new Error(`1 KAS+ consistency check failed: tiers=${tierOnePlus}, cumulative=${total1Plus}`);
-    }
-
-    return {
-      source:'Kaspatrol / api.kaspa.org',
-      capturedAt:new Date().toISOString(),
-      total1Plus,
-      totalBalanceAddresses,
-      minBalanceKas:0.0001,
-      circulating:circMatch?Number(circMatch[1])*1e9:FALLBACK.circulating,
-      concentration:{top10:top10?Number(top10[1]):FALLBACK.concentration.top10,top100:top100?Number(top100[1]):FALLBACK.concentration.top100,top1000:top1000?Number(top1000[1]):FALLBACK.concentration.top1000},
-      tiers
-    };
-  }catch(e){
-    const totalBalanceAddresses=FALLBACK.tiers.reduce((sum,t)=>sum+t.count,0);
-    return {...FALLBACK,totalBalanceAddresses,fallback:true,error:e.message};
+    const [sets,metrics]=await Promise.all([fetchAll(),fetchNetworkMetrics()]),latest=Object.fromEntries(sets.map(set=>[set.key,set.points.at(-1)])),counts=Object.fromEntries(THRESHOLDS.map(([key])=>[key,latest[key]?.value]));
+    if(!validCounts(counts))throw new Error('Kaspalytics threshold consistency check failed');
+    return {source:'Kaspalytics / KasLens',capturedAt:latest['100K+'].capturedAt,total1Plus:counts['1+'],totalBalanceAddresses:counts['0.01+'],minBalanceKas:0.01,circulating:metrics.circulating,concentration:metrics.concentration,cumulative:counts,tiers:[]};
+  }catch(error){
+    console.error('Kaspalytics holder request failed',error?.message||String(error));
+    return {source:'Kaspalytics / KasLens',capturedAt:new Date().toISOString(),total1Plus:null,totalBalanceAddresses:null,minBalanceKas:0.01,circulating:null,concentration:{top10:null,top100:null,top1000:null},cumulative:{},tiers:[],fallback:true,error:error?.message||String(error)};
   }
 }
 
 export function cumulative(snapshot){
-  const t=Object.fromEntries(snapshot.tiers.map(x=>[x.key,x.count]));
-  return {
-    '1+': snapshot.total1Plus,
-    '10+': t['10']+t['100']+t['1k']+t['10k']+t['100k']+t['1m']+t['10m']+t['100m']+t['1b'],
-    '100+': t['100']+t['1k']+t['10k']+t['100k']+t['1m']+t['10m']+t['100m']+t['1b'],
-    '1K+': t['1k']+t['10k']+t['100k']+t['1m']+t['10m']+t['100m']+t['1b'],
-    '10K+': t['10k']+t['100k']+t['1m']+t['10m']+t['100m']+t['1b'],
-    '100K+': t['100k']+t['1m']+t['10m']+t['100m']+t['1b'],
-    '1M+': t['1m']+t['10m']+t['100m']+t['1b'],
-    '10M+': t['10m']+t['100m']+t['1b'],
-    '100M+': t['100m']+t['1b'],
-    '1B+': t['1b']
-  };
+  if(snapshot?.cumulative&&Number.isFinite(snapshot.cumulative['100K+']))return snapshot.cumulative;
+  return {'1+':null,'10+':null,'100+':null,'1K+':null,'10K+':null,'100K+':null,'1M+':null,'10M+':null,'100M+':null,'1B+':null};
 }
