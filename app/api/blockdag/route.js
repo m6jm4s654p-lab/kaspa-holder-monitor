@@ -3,11 +3,11 @@ import { enforceRateLimit, NO_STORE } from '@/lib/api-security';
 
 export const dynamic='force-dynamic';
 
-const KASPA_API='https://api.kaspa.org';
+const KASPA_API='https://kas.nownodes.io';
 const SOMPI=100_000_000;
 const SITE_ORIGIN='https://kaspa-live-blockdag.teacbit.chatgpt.site';
 const CACHE_HEADERS={
-  'Cache-Control':'public, s-maxage=3, stale-while-revalidate=9',
+  'Cache-Control':'public, s-maxage=120, stale-while-revalidate=240',
   'Access-Control-Allow-Origin':SITE_ORIGIN,
   'Access-Control-Allow-Methods':'GET, OPTIONS',
   'Access-Control-Allow-Headers':'Content-Type',
@@ -22,12 +22,12 @@ function corsAllowed(request){
   return !origin||origin===SITE_ORIGIN;
 }
 
-async function fetchJson(path){
+async function fetchJson(path,apiKey){
   const controller=new AbortController();
-  const timeout=setTimeout(()=>controller.abort(),8000);
+  const timeout=setTimeout(()=>controller.abort(),10000);
   try{
     const response=await fetch(`${KASPA_API}${path}`,{
-      headers:{accept:'application/json','user-agent':'KASPA-Holder-Monitor/2.2.19'},
+      headers:{accept:'application/json','api-key':apiKey,'user-agent':'KASPA-Holder-Monitor/2.2.21'},
       cache:'no-store',
       signal:controller.signal
     });
@@ -41,17 +41,22 @@ async function fetchJson(path){
 }
 
 function normalizeBlock(raw){
-  const hash=raw?.verboseData?.hash||raw?.hash||'';
-  const daaScore=Number(raw?.header?.daaScore||raw?.daa_score||0);
-  const rawTimestamp=Number(raw?.header?.timestamp||raw?.timestamp||Date.now());
-  const timestamp=rawTimestamp<10_000_000_000?rawTimestamp*1000:rawTimestamp;
-  const parents=raw?.header?.parents?.flatMap(parent=>parent?.parentHashes||[])||raw?.parent_hashes||[];
+  const header=raw?.header||{};
+  const verbose=raw?.verboseData||{};
+  const hash=verbose?.hash||raw?.hash||'';
+  const daaScore=Number(header?.daaScore||verbose?.daaScore||raw?.daaScore||0);
+  const rawTimestamp=header?.timestamp||raw?.timestamp||Date.now();
+  const numericTimestamp=Number(rawTimestamp);
+  const timestamp=Number.isFinite(numericTimestamp)
+    ?(numericTimestamp<10_000_000_000?numericTimestamp*1000:numericTimestamp)
+    :Date.parse(rawTimestamp);
+  const parents=(header?.parents||raw?.parents||[]).flatMap(parent=>parent?.parentHashes||parent||[]);
   const txs=(raw?.transactions||[]).filter(tx=>(tx?.inputs?.length||0)>0);
   const transactions=txs.map(tx=>{
     const values=(tx?.outputs||[]).map(output=>Number(output?.amount??output?.value??0)/SOMPI);
     const valueKas=Math.max(0,...values);
     return {
-      id:tx?.verboseData?.transactionId||tx?.transactionId||tx?.transaction_id||'',
+      id:tx?.verboseData?.transactionId||tx?.transactionId||'',
       valueKas,
       whale:valueKas>=1_000_000?'mega':valueKas>=100_000?'large':'normal'
     };
@@ -68,7 +73,7 @@ function normalizeBlock(raw){
     volumeKas,
     maxTransferKas:Math.max(0,...transactions.map(tx=>tx.valueKas)),
     transactions,
-    color:raw?.extra?.color||(raw?.verboseData?.isChainBlock?'blue':'red')
+    color:(raw?.isChainBlock??verbose?.isChainBlock)?'blue':'red'
   };
 }
 
@@ -81,24 +86,28 @@ export async function GET(request){
   if(!corsAllowed(request)){
     return NextResponse.json({ok:false,error:'origin_not_allowed'},{status:403,headers:NO_STORE});
   }
-  const limited=enforceRateLimit(request,'blockdag',90);
+  const limited=enforceRateLimit(request,'blockdag',30);
   if(limited)return limited;
 
   try{
-    const state=await fetchJson('/info/blockdag');
-    const tipHash=state?.virtualParentHashes?.[0]||state?.tipHashes?.[0];
-    if(!tipHash)throw new Error('tip_unavailable');
+    const apiKey=process.env.NOWNODES_API_KEY;
+    if(!apiKey)throw new Error('api_key_missing');
 
-    const tipBlock=await fetchJson(`/blocks/${encodeURIComponent(tipHash)}?includeTransactions=false`);
+    const state=await fetchJson('/info/blockdag',apiKey);
+    const tipHash=state?.virtualParentHashes?.[0];
+    if(!tipHash)throw new Error('tip_hash_unavailable');
+
+    const tipBlock=await fetchJson(`/blocks/${encodeURIComponent(tipHash)}?includeTransactions=false`,apiKey);
     const tipBlueScore=Number(tipBlock?.header?.blueScore||tipBlock?.verboseData?.blueScore||0);
     if(!tipBlueScore)throw new Error('blue_score_unavailable');
 
-    const anchorScore=Math.max(0,tipBlueScore-72);
-    const anchors=await fetchJson(`/blocks-from-bluescore?blueScore=${anchorScore}&includeTransactions=false`);
-    const anchorHash=anchors?.[0]?.verboseData?.hash;
-    if(!anchorHash)throw new Error('anchor_unavailable');
+    const anchorBlueScore=Math.max(0,tipBlueScore-72);
+    const anchors=await fetchJson(`/blocks-from-bluescore?blueScore=${anchorBlueScore}&includeTransactions=false`,apiKey);
+    const anchorBlock=Array.isArray(anchors)?anchors[0]:anchors?.blocks?.[0];
+    const anchorHash=anchorBlock?.verboseData?.hash||anchorBlock?.hash;
+    if(!anchorHash)throw new Error('anchor_hash_unavailable');
 
-    const recent=await fetchJson(`/blocks?lowHash=${encodeURIComponent(anchorHash)}&includeBlocks=true&includeTransactions=true`);
+    const recent=await fetchJson(`/blocks?lowHash=${encodeURIComponent(anchorHash)}&includeBlocks=true&includeTransactions=true`,apiKey);
     const rawBlocks=Array.isArray(recent)?recent:recent?.blocks||[];
     const blocks=rawBlocks.map(normalizeBlock)
       .filter(block=>block.hash&&block.daaScore>0)
