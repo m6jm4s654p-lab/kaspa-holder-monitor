@@ -27,7 +27,7 @@ async function fetchJson(path,apiKey){
   const timeout=setTimeout(()=>controller.abort(),10000);
   try{
     const response=await fetch(`${KASPA_API}${path}`,{
-      headers:{accept:'application/json','api-key':apiKey,'user-agent':'KASPA-Holder-Monitor/2.2.21'},
+      headers:{accept:'application/json','api-key':apiKey,'user-agent':'KASPA-Holder-Monitor/2.2.22'},
       cache:'no-store',
       signal:controller.signal
     });
@@ -77,6 +77,17 @@ function normalizeBlock(raw){
   };
 }
 
+function extractAnchorHash(payload){
+  const candidate=Array.isArray(payload)
+    ?payload[0]
+    :payload?.blocks?.[0]
+      ??payload?.blockHashes?.[0]
+      ??payload?.block_hashes?.[0]
+      ??payload?.hashes?.[0];
+  if(typeof candidate==='string')return candidate;
+  return candidate?.verboseData?.hash||candidate?.hash||candidate?.blockHash||'';
+}
+
 export function OPTIONS(request){
   if(!corsAllowed(request))return new NextResponse(null,{status:403,headers:NO_STORE});
   return new NextResponse(null,{status:204,headers:CACHE_HEADERS});
@@ -103,8 +114,7 @@ export async function GET(request){
 
     const anchorBlueScore=Math.max(0,tipBlueScore-72);
     const anchors=await fetchJson(`/blocks-from-bluescore?blueScore=${anchorBlueScore}&includeTransactions=false`,apiKey);
-    const anchorBlock=Array.isArray(anchors)?anchors[0]:anchors?.blocks?.[0];
-    const anchorHash=anchorBlock?.verboseData?.hash||anchorBlock?.hash;
+    const anchorHash=extractAnchorHash(anchors);
     if(!anchorHash)throw new Error('anchor_hash_unavailable');
 
     const recent=await fetchJson(`/blocks?lowHash=${encodeURIComponent(anchorHash)}&includeBlocks=true&includeTransactions=true`,apiKey);
