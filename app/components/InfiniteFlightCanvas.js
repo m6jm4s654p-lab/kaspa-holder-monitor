@@ -119,6 +119,10 @@ export default function InfiniteFlightCanvas({ blocks, selected, paused, onSelec
   const canvasRef = useRef(null);
   const animationRef = useRef(0);
   const lastFrameRef = useRef(0);
+  const flightStartRef = useRef(null);
+  const pauseStartedAtRef = useRef(null);
+  const totalPausedMsRef = useRef(0);
+  const canvasSizeRef = useRef({ cssWidth: 0, cssHeight: 0, dpr: 0 });
   const positionsRef = useRef(new Map());
   const beaconRef = useRef({ hash: "", startedAt: 0 });
   const orderedBlocks = useMemo(() => [...blocks].sort((a, b) => a.daaScore - b.daaScore || a.timestamp - b.timestamp), [blocks]);
@@ -129,6 +133,18 @@ export default function InfiniteFlightCanvas({ blocks, selected, paused, onSelec
     if (beaconHash && beaconHash !== beaconRef.current.hash) beaconRef.current = { hash: beaconHash, startedAt: performance.now() };
     if (!beaconHash) beaconRef.current = { hash: "", startedAt: 0 };
   }, [beaconHash]);
+
+  useEffect(() => {
+    const now = performance.now();
+    if (paused) {
+      if (pauseStartedAtRef.current == null) pauseStartedAtRef.current = now;
+      return;
+    }
+    if (pauseStartedAtRef.current != null) {
+      totalPausedMsRef.current += now - pauseStartedAtRef.current;
+      pauseStartedAtRef.current = null;
+    }
+  }, [paused]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -147,14 +163,25 @@ export default function InfiniteFlightCanvas({ blocks, selected, paused, onSelec
       const dpr = Math.min(window.devicePixelRatio || 1, mobile ? 1 : 1.4);
       const pixelWidth = Math.max(1, Math.round(rect.width * dpr));
       const pixelHeight = Math.max(1, Math.round(rect.height * dpr));
-      if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
-        canvas.width = pixelWidth;
-        canvas.height = pixelHeight;
+      const previousSize = canvasSizeRef.current;
+      const firstSize = previousSize.cssWidth === 0 || previousSize.cssHeight === 0;
+      const meaningfulResize = firstSize
+        || Math.abs(rect.width - previousSize.cssWidth) >= 8
+        || Math.abs(rect.height - previousSize.cssHeight) >= 8
+        || Math.abs(dpr - previousSize.dpr) >= .1;
+      if (meaningfulResize) {
+        if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
+          canvas.width = pixelWidth;
+          canvas.height = pixelHeight;
+        }
+        canvasSizeRef.current = { cssWidth: rect.width, cssHeight: rect.height, dpr };
       }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, rect.width, rect.height);
 
-      const elapsed = time / 1000;
+      if (flightStartRef.current == null) flightStartRef.current = time;
+      const activePauseMs = pauseStartedAtRef.current == null ? 0 : Math.max(0, time - pauseStartedAtRef.current);
+      const elapsed = Math.max(0, (time - flightStartRef.current - totalPausedMsRef.current - activePauseMs) / 1000);
       const cycle = Math.floor(elapsed / CYCLE_SECONDS);
       const seconds = elapsed % CYCLE_SECONDS;
       const phase = flightPhase(seconds);
