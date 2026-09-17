@@ -27,7 +27,7 @@ async function fetchJson(path,apiKey){
   const timeout=setTimeout(()=>controller.abort(),10000);
   try{
     const response=await fetch(`${KASPA_API}${path}`,{
-      headers:{accept:'application/json','api-key':apiKey,'user-agent':'KASPA-Holder-Monitor/2.2.22'},
+      headers:{accept:'application/json','api-key':apiKey,'user-agent':'KASPA-Holder-Monitor/2.3.0'},
       cache:'no-store',
       signal:controller.signal
     });
