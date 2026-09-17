@@ -304,6 +304,7 @@ export default function InfiniteFlightCanvas({ blocks, selected, paused, onSelec
       });
 
       const flowEdges = [];
+      const offscreenParentEdges = [];
       const branchCounts = new Map();
       const edgeKeys = new Set();
       const templatesByHash = new Map(templates.map((node) => [node.block.hash, node]));
@@ -315,7 +316,25 @@ export default function InfiniteFlightCanvas({ blocks, selected, paused, onSelec
           if (birth <= .01) return;
           [...new Set(child.block.parents)].forEach((parentHash, parentIndex) => {
           const parent = templatesByHash.get(parentHash);
-          if (!parent) return;
+          if (!parent) {
+            const edgeKey = `${zone}:offscreen:${parentHash}>${child.block.hash}`;
+            if (edgeKeys.has(edgeKey)) return;
+            edgeKeys.add(edgeKey);
+            // The parent hash is real, but its visual position is outside the current
+            // block window. Extend a deterministic fading guide backward to indicate
+            // that the real parent relationship continues beyond the visible dataset.
+            const side = hashUnit(parentHash || child.block.hash, 91 + parentIndex) < .5 ? -1 : 1;
+            const spread = 12 + hashUnit(parentHash || child.block.hash, 97 + parentIndex) * 18;
+            const lift = (hashUnit(parentHash || child.block.hash, 101 + parentIndex) - .5) * 14;
+            const childWorld = { x: child.x, y: child.y, z: zone * REGION_LENGTH + child.localZ };
+            const endWorld = {
+              x: childWorld.x + side * spread,
+              y: childWorld.y + lift,
+              z: childWorld.z - (26 + hashUnit(parentHash || child.block.hash, 107 + parentIndex) * 24),
+            };
+            offscreenParentEdges.push({ child, zone, birth, parentHash, parentIndex, childWorld, endWorld });
+            return;
+          }
           const edgeKey = `${zone}:${parentHash}>${child.block.hash}`;
           if (edgeKeys.has(edgeKey)) return;
           edgeKeys.add(edgeKey);
@@ -356,6 +375,32 @@ export default function InfiniteFlightCanvas({ blocks, selected, paused, onSelec
         if (point.x < -marginX || point.x > rect.width + marginX || point.y < -marginY || point.y > rect.height + marginY) return null;
         return point;
       };
+
+      // Parents outside the current block window are real parent hashes, but their
+      // on-screen coordinates are unknown. Draw a fading continuation guide only;
+      // this does not invent a parent block position or a synthetic parent relation.
+      ctx.save();
+      ctx.lineCap = "round";
+      offscreenParentEdges.forEach((edge) => {
+        const steps = mobile ? 6 : 9;
+        for (let step = 0; step < steps; step += 1) {
+          const t0 = step / steps;
+          const t1 = (step + 1) / steps;
+          const w0 = lerp3(edge.childWorld, edge.endWorld, t0);
+          const w1 = lerp3(edge.childWorld, edge.endWorld, t1);
+          const p0 = projectEdgePoint(w0);
+          const p1 = projectEdgePoint(w1);
+          if (!p0 || !p1) continue;
+          const fade = Math.max(0, 1 - t0);
+          ctx.strokeStyle = `rgba(143,255,244,${.46 * fade * edge.birth})`;
+          ctx.lineWidth = p0.depth < 70 ? 1.05 : .68;
+          ctx.beginPath();
+          ctx.moveTo(p0.x, p0.y);
+          ctx.lineTo(p1.x, p1.y);
+          ctx.stroke();
+        }
+      });
+      ctx.restore();
 
       // Every visible parent-to-child edge carries moving data packets. Multiple edges
       // animate at the same time to express Kaspa's parallel, distributed processing.
