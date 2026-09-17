@@ -314,45 +314,71 @@ export default function InfiniteFlightCanvas({ blocks, selected, paused, onSelec
           const nodeBirth = clamp01((child.localZ - 16) / 102);
           const birth = zoneGrowth >= 1 ? 1 : smooth((zoneGrowth - nodeBirth + .075) / .075);
           if (birth <= .01) return;
-          [...new Set(child.block.parents)].forEach((parentHash, parentIndex) => {
-          const parent = templatesByHash.get(parentHash);
-          if (!parent) {
-            const edgeKey = `${zone}:offscreen:${parentHash}>${child.block.hash}`;
+          const uniqueParents = [...new Set(child.block.parents)];
+          const visibleParents = uniqueParents
+            .map((parentHash, parentIndex) => ({ parentHash, parentIndex, parent: templatesByHash.get(parentHash) }))
+            .filter((entry) => entry.parent);
+
+          // Draw real parent relationships whenever the parent is inside the current block window.
+          visibleParents.forEach(({ parentHash, parentIndex, parent }) => {
+            const edgeKey = `${zone}:${parentHash}>${child.block.hash}`;
             if (edgeKeys.has(edgeKey)) return;
             edgeKeys.add(edgeKey);
-            // The parent hash is real, but its visual position is outside the current
-            // block window. Extend a deterministic fading guide backward to indicate
-            // that the real parent relationship continues beyond the visible dataset.
-            const side = hashUnit(parentHash || child.block.hash, 91 + parentIndex) < .5 ? -1 : 1;
-            const spread = 12 + hashUnit(parentHash || child.block.hash, 97 + parentIndex) * 18;
-            const lift = (hashUnit(parentHash || child.block.hash, 101 + parentIndex) - .5) * 14;
+            const key = `${zone}:${parentHash}`;
+            branchCounts.set(key, (branchCounts.get(key) ?? 0) + 1);
+            const parentWorld = { x: parent.x, y: parent.y, z: zone * REGION_LENGTH + parent.localZ };
             const childWorld = { x: child.x, y: child.y, z: zone * REGION_LENGTH + child.localZ };
-            const endWorld = {
-              x: childWorld.x + side * spread,
-              y: childWorld.y + lift,
-              z: childWorld.z - (26 + hashUnit(parentHash || child.block.hash, 107 + parentIndex) * 24),
+            const dx = childWorld.x - parentWorld.x;
+            const dy = childWorld.y - parentWorld.y;
+            const distance = Math.hypot(dx, dy) || 1;
+            const bend = (hashUnit(child.block.hash, 61 + parentIndex) - .5) * 16;
+            const control = {
+              x: (parentWorld.x + childWorld.x) / 2 - dy / distance * bend,
+              y: (parentWorld.y + childWorld.y) / 2 + dx / distance * bend,
+              z: (parentWorld.z + childWorld.z) / 2,
             };
-            offscreenParentEdges.push({ child, zone, birth, parentHash, parentIndex, childWorld, endWorld });
-            return;
+            flowEdges.push({ parent, child, zone, birth, control });
+          });
+
+          // If none of this block's real parents are visible, add 1–3 visual continuation
+          // guides. Their count and 3D directions are deterministic-random per block so
+          // they do not flicker between frames. These guides mean "continues outside the
+          // visible window"; they do not represent additional real parent relationships.
+          if (uniqueParents.length > 0 && visibleParents.length === 0) {
+            const guideCount = 1 + Math.floor(hashUnit(child.block.hash, 191) * 3);
+            const childWorld = { x: child.x, y: child.y, z: zone * REGION_LENGTH + child.localZ };
+
+            for (let guideIndex = 0; guideIndex < guideCount; guideIndex += 1) {
+              const edgeKey = `${zone}:offscreen-guide:${child.block.hash}:${guideIndex}`;
+              if (edgeKeys.has(edgeKey)) continue;
+              edgeKeys.add(edgeKey);
+
+              const azimuth = hashUnit(child.block.hash, 211 + guideIndex * 17) * Math.PI * 2;
+              const elevation = (hashUnit(child.block.hash, 223 + guideIndex * 19) - .5) * Math.PI * .82;
+              const length = 28 + hashUnit(child.block.hash, 239 + guideIndex * 23) * 34;
+              const horizontal = Math.cos(elevation);
+
+              const direction = {
+                x: Math.cos(azimuth) * horizontal,
+                y: Math.sin(elevation),
+                z: Math.sin(azimuth) * horizontal,
+              };
+              const endWorld = {
+                x: childWorld.x + direction.x * length,
+                y: childWorld.y + direction.y * length,
+                z: childWorld.z + direction.z * length,
+              };
+
+              offscreenParentEdges.push({
+                child,
+                zone,
+                birth,
+                guideIndex,
+                childWorld,
+                endWorld,
+              });
+            }
           }
-          const edgeKey = `${zone}:${parentHash}>${child.block.hash}`;
-          if (edgeKeys.has(edgeKey)) return;
-          edgeKeys.add(edgeKey);
-          const key = `${zone}:${parentHash}`;
-          branchCounts.set(key, (branchCounts.get(key) ?? 0) + 1);
-          const parentWorld = { x: parent.x, y: parent.y, z: zone * REGION_LENGTH + parent.localZ };
-          const childWorld = { x: child.x, y: child.y, z: zone * REGION_LENGTH + child.localZ };
-          const dx = childWorld.x - parentWorld.x;
-          const dy = childWorld.y - parentWorld.y;
-          const distance = Math.hypot(dx, dy) || 1;
-          const bend = (hashUnit(child.block.hash, 61 + parentIndex) - .5) * 16;
-          const control = {
-            x: (parentWorld.x + childWorld.x) / 2 - dy / distance * bend,
-            y: (parentWorld.y + childWorld.y) / 2 + dx / distance * bend,
-            z: (parentWorld.z + childWorld.z) / 2,
-          };
-          flowEdges.push({ parent, child, zone, birth, control });
-        });
         });
       }
 
@@ -376,9 +402,9 @@ export default function InfiniteFlightCanvas({ blocks, selected, paused, onSelec
         return point;
       };
 
-      // Parents outside the current block window are real parent hashes, but their
-      // on-screen coordinates are unknown. Draw a fading continuation guide only;
-      // this does not invent a parent block position or a synthetic parent relation.
+      // Blocks with no visible parent get 1–3 fading continuation guides in
+      // deterministic-random 3D directions. These guides only indicate that the DAG
+      // continues outside the visible window; they are not extra real parent edges.
       ctx.save();
       ctx.lineCap = "round";
       offscreenParentEdges.forEach((edge) => {
