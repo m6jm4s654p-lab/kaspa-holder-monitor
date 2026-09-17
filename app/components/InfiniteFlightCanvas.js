@@ -124,6 +124,7 @@ export default function InfiniteFlightCanvas({ blocks, selected, paused, onSelec
   const totalPausedMsRef = useRef(0);
   const canvasSizeRef = useRef({ cssWidth: 0, cssHeight: 0, dpr: 0 });
   const positionsRef = useRef(new Map());
+  const frontierFollowRef = useRef(null);
   const beaconRef = useRef({ hash: "", startedAt: 0 });
   const orderedBlocks = useMemo(() => [...blocks].sort((a, b) => a.daaScore - b.daaScore || a.timestamp - b.timestamp), [blocks]);
   const templates = useMemo(() => makeTemplates(orderedBlocks), [orderedBlocks]);
@@ -243,13 +244,24 @@ export default function InfiniteFlightCanvas({ blocks, selected, paused, onSelec
           }
         }
         if (seconds < 26) {
+          // The active frontier changes discretely as new DAG nodes are born. Smooth
+          // that changing point before it influences the camera so CRUISE never snaps
+          // from one frontier block to another.
+          const previousFrontier = frontierFollowRef.current;
+          if (!previousFrontier || Math.abs(previousFrontier.z - frontierWorld.z) > REGION_LENGTH * .9) {
+            frontierFollowRef.current = { ...frontierWorld };
+          } else {
+            const smoothing = 1 - Math.exp(-frameInterval / 900);
+            frontierFollowRef.current = lerp3(previousFrontier, frontierWorld, smoothing);
+          }
+          const followedFrontier = frontierFollowRef.current;
           const follow = smooth(seconds / 4);
           camera = {
-            x: lerp(camera.x, frontierWorld.x, follow * .18),
-            y: lerp(camera.y, frontierWorld.y, follow * .14),
+            x: lerp(camera.x, followedFrontier.x, follow * .18),
+            y: lerp(camera.y, followedFrontier.y, follow * .14),
             z: camera.z,
           };
-          target = lerp3(target, { x: frontierWorld.x, y: frontierWorld.y, z: frontierWorld.z + 12 }, follow * .62);
+          target = lerp3(target, { x: followedFrontier.x, y: followedFrontier.y, z: followedFrontier.z + 12 }, follow * .62);
         }
       }
 
