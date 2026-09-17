@@ -13,7 +13,7 @@ const blockSignal=block=>({mega:'MEGA WHALE DETECTED',large:'100K+ FLOW DETECTED
 export default function BlockDAGView(){
  const [data,setData]=useState(null),[selected,setSelected]=useState(null),[paused,setPaused]=useState(false),[error,setError]=useState(false);
  const load=useCallback(async()=>{try{const response=await fetch('/api/blockdag',{cache:'no-store'});if(!response.ok)throw new Error(`blockdag ${response.status}`);const payload=await response.json();if(!payload?.ok||!payload.blocks?.length)throw new Error('blockdag unavailable');setData(payload);setSelected(current=>payload.blocks.find(block=>block.hash===current?.hash)??current??payload.blocks.at(-1)??null);setError(false)}catch{setError(true)}},[]);
- useEffect(()=>{void load();if(paused)return;const timer=window.setInterval(load,120_000);return()=>window.clearInterval(timer)},[load,paused]);
+ useEffect(()=>{void load();if(paused)return;const timer=window.setInterval(load,60_000);return()=>window.clearInterval(timer)},[load,paused]);
  const summary=useMemo(()=>{const blocks=data?.blocks??[];return {txs:blocks.reduce((sum,block)=>sum+block.txCount,0),volume:blocks.reduce((sum,block)=>sum+block.volumeKas,0),large:blocks.filter(block=>block.maxTransferKas>=100_000).length,mega:blocks.filter(block=>block.maxTransferKas>=1_000_000).length}},[data]);
  const visibleTransfers=(selected?.transactions??[]).filter(tx=>tx.valueKas>=1_000).sort((a,b)=>b.valueKas-a.valueKas);
  const lastUpdate=data?.fetchedAt?new Date(data.fetchedAt).toLocaleTimeString('ja-JP',{hour12:false}):'—';
@@ -33,9 +33,9 @@ export default function BlockDAGView(){
   </section>
   <section className="dagWorkspace">
    <div className="dagPanel">
-    <div className="dagPanelHead"><div><span>LIVE DATA · INFINITE FLIGHT v2.3.2</span><h1>Live BlockDAG</h1></div><div className="dagLegend"><span><i className="normal"/>通常</span><span><i className="small"/>1K+</span><span><i className="medium"/>10K+</span><span><i className="large"/>100K+</span><span><i className="mega"/>1M+</span></div></div>
+    <div className="dagPanelHead"><div><span>LIVE DATA · INFINITE FLIGHT v2.3.0 · 60s DELAY</span><h1>Live BlockDAG</h1></div><div className="dagLegend"><span><i className="normal"/>通常</span><span><i className="small"/>1K+</span><span><i className="medium"/>10K+</span><span><i className="large"/>100K+</span><span><i className="mega"/>1M+</span></div></div>
     <div className="dagCanvasWrap">{data?.blocks.length?<InfiniteFlightCanvas blocks={data.blocks} selected={selected?.hash} paused={paused} onSelect={setSelected}/>:<div className="dagLoading">{error?'BlockDAGデータを取得できません':'BlockDAGに接続中'}</div>}<span className="dagAxis left">FLIGHT PATH</span><span className="dagAxis right">LIVE DAG</span></div>
-    <div className="dagPanelFoot"><span>生成されるDAG最前線を追従</span><span>宇宙空間を連続飛行</span><span>最終取得 {lastUpdate}</span></div>
+    <div className="dagPanelFoot"><span>生成されるDAG最前線を追従</span><span>宇宙空間を連続飛行</span><span>60秒遅延LIVE</span><span>最終取得 {lastUpdate}</span></div>
    </div>
    <aside className="dagInspector">
     <div className="dagInspectorTitle"><span>BLOCK INSPECTOR</span><b>{selected?shortHash(selected.hash):'ブロックを選択'}</b></div>

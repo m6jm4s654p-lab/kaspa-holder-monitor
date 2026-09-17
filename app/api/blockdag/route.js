@@ -7,7 +7,7 @@ const KASPA_API='https://kas.nownodes.io';
 const SOMPI=100_000_000;
 const SITE_ORIGIN='https://kaspa-live-blockdag.teacbit.chatgpt.site';
 const CACHE_HEADERS={
-  'Cache-Control':'public, s-maxage=120, stale-while-revalidate=240',
+  'Cache-Control':'public, s-maxage=60, stale-while-revalidate=120',
   'Access-Control-Allow-Origin':SITE_ORIGIN,
   'Access-Control-Allow-Methods':'GET, OPTIONS',
   'Access-Control-Allow-Headers':'Content-Type',
@@ -27,7 +27,7 @@ async function fetchJson(path,apiKey){
   const timeout=setTimeout(()=>controller.abort(),10000);
   try{
     const response=await fetch(`${KASPA_API}${path}`,{
-      headers:{accept:'application/json','api-key':apiKey,'user-agent':'KASPA-Holder-Monitor/2.3.0'},
+      headers:{accept:'application/json','api-key':apiKey,'user-agent':'KASPA-Holder-Monitor/2.3.0-60s-delay'},
       cache:'no-store',
       signal:controller.signal
     });
@@ -112,23 +112,30 @@ export async function GET(request){
     const tipBlueScore=Number(tipBlock?.header?.blueScore||tipBlock?.verboseData?.blueScore||0);
     if(!tipBlueScore)throw new Error('blue_score_unavailable');
 
-    const anchorBlueScore=Math.max(0,tipBlueScore-72);
+    const anchorBlueScore=Math.max(0,tipBlueScore-900);
     const anchors=await fetchJson(`/blocks-from-bluescore?blueScore=${anchorBlueScore}&includeTransactions=false`,apiKey);
     const anchorHash=extractAnchorHash(anchors);
     if(!anchorHash)throw new Error('anchor_hash_unavailable');
 
     const recent=await fetchJson(`/blocks?lowHash=${encodeURIComponent(anchorHash)}&includeBlocks=true&includeTransactions=true`,apiKey);
     const rawBlocks=Array.isArray(recent)?recent:recent?.blocks||[];
-    const blocks=rawBlocks.map(normalizeBlock)
-      .filter(block=>block.hash&&block.daaScore>0)
-      .sort((a,b)=>a.daaScore-b.daaScore||a.timestamp-b.timestamp)
+    const fetchedAtMs=Date.now();
+    const delayMs=60_000;
+    const playbackCutoff=fetchedAtMs-delayMs;
+    const normalized=rawBlocks.map(normalizeBlock)
+      .filter(block=>block.hash&&block.daaScore>0&&Number.isFinite(block.timestamp))
+      .sort((a,b)=>a.daaScore-b.daaScore||a.timestamp-b.timestamp);
+    const blocks=normalized
+      .filter(block=>block.timestamp<=playbackCutoff)
       .slice(-48);
-    if(!blocks.length)throw new Error('blocks_unavailable');
+    if(!blocks.length)throw new Error('delayed_blocks_unavailable');
 
     return NextResponse.json({
       ok:true,
-      source:'live',
-      fetchedAt:new Date().toISOString(),
+      source:'live-delayed',
+      delaySeconds:60,
+      fetchedAt:new Date(fetchedAtMs).toISOString(),
+      playbackAt:new Date(playbackCutoff).toISOString(),
       network:state?.networkName||'kaspa-mainnet',
       virtualDaaScore:Number(state?.virtualDaaScore||0),
       blocks
