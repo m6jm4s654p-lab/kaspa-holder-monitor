@@ -411,12 +411,12 @@ export default function InfiniteFlightCanvas({ blocks, selected, paused, onSelec
             flowEdges.push({ parent, child, zone, birth, control });
           });
 
-          // If none of this block's real parents are visible, add 1–3 visual continuation
+          // If none of this block's real parents are visible, add 1–5 visual continuation
           // guides. Their count and 3D directions are deterministic-random per block so
           // they do not flicker between frames. These guides mean "continues outside the
           // visible window"; they do not represent additional real parent relationships.
           if (uniqueParents.length > 0 && visibleParents.length === 0) {
-            const guideCount = 1 + Math.floor(hashUnit(child.block.hash, 191) * 3);
+            const guideCount = 1 + Math.floor(hashUnit(child.block.hash, 191) * 5);
             const childWorld = { x: child.x, y: child.y, z: zone * REGION_LENGTH + child.localZ };
 
             for (let guideIndex = 0; guideIndex < guideCount; guideIndex += 1) {
@@ -426,7 +426,9 @@ export default function InfiniteFlightCanvas({ blocks, selected, paused, onSelec
 
               const azimuth = hashUnit(child.block.hash, 211 + guideIndex * 17) * Math.PI * 2;
               const elevation = (hashUnit(child.block.hash, 223 + guideIndex * 19) - .5) * Math.PI * .82;
-              const length = 28 + hashUnit(child.block.hash, 239 + guideIndex * 23) * 34;
+              // Extend the guide far enough that its projected line continues beyond
+              // the viewport instead of fading out inside the scene.
+              const length = 220 + hashUnit(child.block.hash, 239 + guideIndex * 23) * 180;
               const horizontal = Math.cos(elevation);
 
               const direction = {
@@ -473,29 +475,31 @@ export default function InfiniteFlightCanvas({ blocks, selected, paused, onSelec
         return point;
       };
 
-      // Blocks with no visible parent get 1–3 fading continuation guides in
-      // deterministic-random 3D directions. These guides only indicate that the DAG
-      // continues outside the visible window; they are not extra real parent edges.
+      // Blocks with no visible parent get 1–5 solid continuation guides in
+      // deterministic-random 3D directions. The guides extend beyond the viewport
+      // instead of fading out inside the scene. They are visual continuation cues,
+      // not additional real parent relationships.
       ctx.save();
       ctx.lineCap = "round";
       offscreenParentEdges.forEach((edge) => {
-        const steps = mobile ? 6 : 9;
-        for (let step = 0; step < steps; step += 1) {
-          const t0 = step / steps;
-          const t1 = (step + 1) / steps;
-          const w0 = lerp3(edge.childWorld, edge.endWorld, t0);
-          const w1 = lerp3(edge.childWorld, edge.endWorld, t1);
-          const p0 = projectEdgePoint(w0);
-          const p1 = projectEdgePoint(w1);
-          if (!p0 || !p1) continue;
-          const fade = Math.max(0, 1 - t0);
-          ctx.strokeStyle = `rgba(143,255,244,${.46 * fade * edge.birth})`;
-          ctx.lineWidth = p0.depth < 70 ? 1.05 : .68;
-          ctx.beginPath();
-          ctx.moveTo(p0.x, p0.y);
-          ctx.lineTo(p1.x, p1.y);
-          ctx.stroke();
+        const steps = mobile ? 14 : 20;
+        let drawing = false;
+        ctx.strokeStyle = `rgba(143,255,244,${.42 * edge.birth})`;
+        ctx.beginPath();
+        for (let step = 0; step <= steps; step += 1) {
+          const t = step / steps;
+          const world = lerp3(edge.childWorld, edge.endWorld, t);
+          const point = projectEdgePoint(world);
+          if (!point) {
+            drawing = false;
+            continue;
+          }
+          ctx.lineWidth = point.depth < 70 ? 1.05 : .68;
+          if (!drawing) ctx.moveTo(point.x, point.y);
+          else ctx.lineTo(point.x, point.y);
+          drawing = true;
         }
+        ctx.stroke();
       });
       ctx.restore();
 
@@ -556,46 +560,69 @@ export default function InfiniteFlightCanvas({ blocks, selected, paused, onSelec
       projected.forEach((node) => {
         const level = blockLevel(node.block);
         const color = level === "mega" ? "#b36cff" : level === "large" ? "#ff4d64" : level === "medium" ? "#ff9f43" : level === "small" ? "#ffd84d" : "#49e7d5";
+
+        // New blocks must not pop in at full size. Convert the raw birth value into
+        // a visual emergence curve: tiny/faint point -> smooth growth -> final size,
+        // opacity and glow. A tiny non-zero floor keeps the very first frame visible.
+        const birthVisual = smooth(clamp01(node.birth));
+        const birthScale = lerp(.08, 1, birthVisual);
+        const birthAlpha = Math.pow(birthVisual, 1.35);
+        const glowScale = smooth(clamp01((birthVisual - .18) / .82));
+
         const processProgress = (time / 1180 + hashUnit(node.block.hash, 73) * 2.7) % 1;
-        const isProcessing = node.zone === cycle && node.birth > .82 && node.lod !== "far" && processProgress < .32;
+        const isProcessing = node.zone === cycle && birthVisual > .82 && node.lod !== "far" && processProgress < .32;
         if (isProcessing) parallelCount += 1;
         const current = positions.get(node.block.hash);
-        if (node.lod !== "far" && (!current || node.depth < current.depth)) positions.set(node.block.hash, { x: node.sx, y: node.sy, radius: Math.max(6, node.radius), depth: node.depth });
+        if (node.lod !== "far" && (!current || node.depth < current.depth)) positions.set(node.block.hash, { x: node.sx, y: node.sy, radius: Math.max(6, node.radius * birthScale), depth: node.depth });
         ctx.save();
         if (node.lod === "far") {
-          ctx.globalAlpha = (level === "normal" ? .34 : .7) * node.birth;
+          ctx.globalAlpha = (level === "normal" ? .34 : .7) * birthAlpha;
           ctx.fillStyle = color;
-          ctx.fillRect(node.sx, node.sy, level === "normal" ? 1 : 1.7, level === "normal" ? 1 : 1.7);
+          const farSize = (level === "normal" ? 1 : 1.7) * birthScale;
+          ctx.fillRect(node.sx - farSize / 2, node.sy - farSize / 2, farSize, farSize);
         } else if (node.lod === "mid") {
-          ctx.globalAlpha = (level === "normal" ? .62 : .92) * node.birth;
+          ctx.globalAlpha = (level === "normal" ? .62 : .92) * birthAlpha;
           ctx.fillStyle = color;
-          if (level !== "normal") { ctx.shadowColor = color; ctx.shadowBlur = mobile ? 5 : 9; }
-          ctx.beginPath(); ctx.arc(node.sx, node.sy, Math.max(1.35, node.radius * .58), 0, Math.PI * 2); ctx.fill();
+          if (level !== "normal") {
+            ctx.shadowColor = color;
+            ctx.shadowBlur = (mobile ? 5 : 9) * glowScale;
+          }
+          const midRadius = Math.max(.28, node.radius * .58 * birthScale);
+          ctx.beginPath(); ctx.arc(node.sx, node.sy, midRadius, 0, Math.PI * 2); ctx.fill();
         } else {
-          ctx.globalAlpha = .94 * node.birth;
+          ctx.globalAlpha = .94 * birthAlpha;
           ctx.fillStyle = color;
           if (!mobile || level !== "normal") {
             ctx.shadowColor = color;
-            ctx.shadowBlur = level === "normal" ? 4 : mobile ? 7 : 11;
+            ctx.shadowBlur = (level === "normal" ? 4 : mobile ? 7 : 11) * glowScale;
           }
-          ctx.beginPath(); ctx.arc(node.sx, node.sy, node.radius, 0, Math.PI * 2); ctx.fill();
+          const nearRadius = Math.max(.38, node.radius * birthScale);
+          ctx.beginPath(); ctx.arc(node.sx, node.sy, nearRadius, 0, Math.PI * 2); ctx.fill();
           ctx.shadowBlur = 0;
-          ctx.strokeStyle = selected === node.block.hash ? "#ffffff" : "rgba(225,255,251,.46)";
-          ctx.lineWidth = selected === node.block.hash ? 1.8 : .8;
-          ctx.beginPath(); ctx.arc(node.sx, node.sy, node.radius + 2.5, 0, Math.PI * 2); ctx.stroke();
-          const activity = clamp01(Math.log10(Math.max(1, node.block.volumeKas)) / 8);
-          ctx.strokeStyle = color;
-          ctx.globalAlpha = .25 + activity * .42;
-          ctx.lineWidth = 1.2;
-          ctx.beginPath(); ctx.arc(node.sx, node.sy, node.radius + 6, -.5 * Math.PI, (-.5 + 2 * activity) * Math.PI); ctx.stroke();
+
+          // Rings and activity arcs fade in after the core dot has started forming,
+          // preventing the outline from appearing before the block itself.
+          const detailAlpha = smooth(clamp01((birthVisual - .28) / .72));
+          if (detailAlpha > .01) {
+            ctx.globalAlpha = detailAlpha * birthAlpha;
+            ctx.strokeStyle = selected === node.block.hash ? "#ffffff" : "rgba(225,255,251,.46)";
+            ctx.lineWidth = (selected === node.block.hash ? 1.8 : .8) * lerp(.45, 1, detailAlpha);
+            ctx.beginPath(); ctx.arc(node.sx, node.sy, nearRadius + 2.5 * detailAlpha, 0, Math.PI * 2); ctx.stroke();
+
+            const activity = clamp01(Math.log10(Math.max(1, node.block.volumeKas)) / 8);
+            ctx.strokeStyle = color;
+            ctx.globalAlpha = (.25 + activity * .42) * detailAlpha * birthAlpha;
+            ctx.lineWidth = 1.2 * lerp(.45, 1, detailAlpha);
+            ctx.beginPath(); ctx.arc(node.sx, node.sy, nearRadius + 6 * detailAlpha, -.5 * Math.PI, (-.5 + 2 * activity) * Math.PI); ctx.stroke();
+          }
         }
         if (isProcessing) {
           ctx.shadowBlur = 0;
           ctx.strokeStyle = color;
-          ctx.globalAlpha = .46 * (1 - processProgress / .32);
-          ctx.lineWidth = node.lod === "near" ? 1.2 : .7;
+          ctx.globalAlpha = .46 * (1 - processProgress / .32) * birthAlpha;
+          ctx.lineWidth = (node.lod === "near" ? 1.2 : .7) * birthScale;
           ctx.beginPath();
-          ctx.arc(node.sx, node.sy, Math.max(4, node.radius) + 5 + processProgress * 18, -.72 * Math.PI, .68 * Math.PI);
+          ctx.arc(node.sx, node.sy, Math.max(1, node.radius * birthScale) + 5 * birthScale + processProgress * 18, -.72 * Math.PI, .68 * Math.PI);
           ctx.stroke();
         }
         ctx.restore();
