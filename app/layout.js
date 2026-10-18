@@ -1,4 +1,5 @@
 import './globals.css';
+import AppUpdateManager from './components/AppUpdateManager';
 
 export const metadata = {
   metadataBase: new URL('https://kaspa-holder-monitor-five.vercel.app'),
@@ -59,7 +60,7 @@ export const viewport = {
 export default function RootLayout({ children }) {
   return (
     <html lang="ja">
-      <body>{children}</body>
+      <body><AppUpdateManager/>{children}</body>
     </html>
   );
 }
