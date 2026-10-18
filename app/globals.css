@@ -75,7 +75,7 @@
 @media(max-width:390px){.marketChart,.fixedPriceAxis{height:205px}}
 @media(max-width:560px){.pulseSignals{grid-template-columns:1fr}.pulseSignals>div{padding:8px 9px}.pulseSummary{font-size:10px}.derivativesGrid b{font-size:11px}}
 
-/* v2.3.0: LIVE BLOCKDAG */
+/* v2.4.1: LIVE BLOCKDAG */
 .heroTitleRow{display:flex;align-items:center;justify-content:space-between;gap:14px}.heroTitleRow h1{min-width:0}.heroDagEntry{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:31px;padding:0 12px;border:1px solid rgba(73,234,193,.4);border-radius:99px;background:linear-gradient(135deg,rgba(73,234,193,.14),rgba(5,34,29,.88));color:#dffff7;text-decoration:none;font-size:9px;font-weight:950;letter-spacing:1px;white-space:nowrap;box-shadow:0 0 16px rgba(73,234,193,.1)}.heroDagEntry:hover{background:linear-gradient(135deg,rgba(73,234,193,.22),rgba(5,34,29,.94));border-color:rgba(73,234,193,.7)}.heroDagEntry i{display:block;width:8px;height:8px;border-radius:50%;background:#7ffff0;box-shadow:0 0 5px #7ffff0,0 0 12px #49eac1,0 0 22px rgba(73,234,193,.75);animation:dagOnlinePulse 1.8s ease-in-out infinite}
 @keyframes dagOnlinePulse{0%,100%{opacity:.78;transform:scale(.88);box-shadow:0 0 5px #7ffff0,0 0 11px #49eac1,0 0 18px rgba(73,234,193,.55)}50%{opacity:1;transform:scale(1.08);box-shadow:0 0 7px #cafff7,0 0 16px #49eac1,0 0 28px rgba(73,234,193,.9)}}
 .dagApp{--dagKas:#49e7d5;--dagYellow:#ffd84d;--dagOrange:#ff9f43;--dagRed:#ff4d64;--dagPurple:#b36cff;min-height:100vh;padding:0 16px 24px;color:#eaf9f8;background:radial-gradient(circle at 42% 10%,rgba(33,132,133,.14),transparent 34%),#03080d}
