@@ -8,7 +8,7 @@ export async function GET(request){
   return NextResponse.json({
     ok:true,
     app:'KASPA Holder Monitor',
-    version:'2.4.1',
+    version:'2.4.2',
     now:new Date().toISOString()
   },{headers:NO_STORE});
 }

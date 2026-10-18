@@ -47,7 +47,7 @@ export default function BlockDAGView(){
   </section>
   <section className="dagWorkspace">
    <div className="dagPanel">
-    <div className="dagPanelHead"><div><span>BUFFERED LIVE · INFINITE FLIGHT v2.4.1</span><h1>Live BlockDAG</h1></div><div className="dagLegend"><span><i className="normal"/>通常</span><span><i className="small"/>1K+</span><span><i className="medium"/>10K+</span><span><i className="large"/>100K+</span><span><i className="mega"/>1M+</span></div></div>
+    <div className="dagPanelHead"><div><span>BUFFERED LIVE · INFINITE FLIGHT v2.4.2</span><h1>Live BlockDAG</h1></div><div className="dagLegend"><span><i className="normal"/>通常</span><span><i className="small"/>1K+</span><span><i className="medium"/>10K+</span><span><i className="large"/>100K+</span><span><i className="mega"/>1M+</span></div></div>
     <div className="dagCanvasWrap">{canvasBlocks.length?<InfiniteFlightCanvas blocks={canvasBlocks} selected={selected?.hash} paused={paused} onSelect={setSelected}/>:<div className="dagLoading">{error?`データ取得待機中 · 再試行 ${retryCount}回`:'120秒バッファを準備中'}</div>}<span className="dagAxis left">FLIGHT PATH</span><span className="dagAxis right">LIVE −60s</span></div>
     <div className="dagPanelFoot"><span>120秒先読み・60秒遅延配信</span><span>CDN共有データ・BUFFER {bufferAheadSeconds}s</span><span>最終取得 {lastUpdate}</span></div>
    </div>

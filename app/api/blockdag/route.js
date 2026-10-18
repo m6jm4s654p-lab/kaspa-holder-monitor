@@ -3,7 +3,8 @@ import { enforceRateLimit, NO_STORE } from '@/lib/api-security';
 
 export const dynamic='force-dynamic';
 
-const KASPA_API='https://kas.nownodes.io';
+const NOWNODES_API='https://kas.nownodes.io';
+const PUBLIC_KASPA_API='https://api.kaspa.org';
 const SOMPI=100_000_000;
 const BUFFER_SECONDS=120;
 const BPS=10;
@@ -28,12 +29,24 @@ function corsAllowed(request){
   return !origin||origin===SITE_ORIGIN;
 }
 
-async function fetchJson(path,apiKey){
+function providerList(){
+  const providers=[];
+  const apiKey=process.env.NOWNODES_API_KEY;
+  if(apiKey){
+    providers.push({id:'nownodes',baseUrl:NOWNODES_API,headers:{'api-key':apiKey}});
+  }
+  const configured=process.env.KASPA_PUBLIC_API_URL?.trim();
+  const publicUrl=configured&&configured.startsWith('https://')?configured.replace(/\/$/,''):PUBLIC_KASPA_API;
+  providers.push({id:'kaspa-public',baseUrl:publicUrl,headers:{}});
+  return providers;
+}
+
+async function fetchJson(provider,path){
   const controller=new AbortController();
   const timeout=setTimeout(()=>controller.abort(),25000);
   try{
-    const response=await fetch(`${KASPA_API}${path}`,{
-      headers:{accept:'application/json','api-key':apiKey,'user-agent':'KASPA-Holder-Monitor/2.4.1'},
+    const response=await fetch(`${provider.baseUrl}${path}`,{
+      headers:{accept:'application/json','user-agent':'KASPA-Holder-Monitor/2.4.2',...provider.headers},
       cache:'no-store',
       signal:controller.signal
     });
@@ -44,6 +57,79 @@ async function fetchJson(path,apiKey){
   }finally{
     clearTimeout(timeout);
   }
+}
+
+async function loadSnapshot(provider){
+  // A warm function only requests blocks newer than the shared cursor. The
+  // cursor is provider-neutral, so a failed paid provider can hand over to
+  // the public Kaspa API without rebuilding the entire 120-second window.
+  if(sharedSnapshot?.cursor){
+    const recent=await fetchJson(provider,`/blocks?lowHash=${encodeURIComponent(sharedSnapshot.cursor)}&includeBlocks=true&includeTransactions=true`);
+    const rawBlocks=Array.isArray(recent)?recent:recent?.blocks||[];
+    const incoming=rawBlocks.map(normalizeBlock)
+      .filter(block=>block.hash&&block.hash!==sharedSnapshot.cursor&&block.daaScore>0);
+    const merged=[...new Map([...sharedSnapshot.blocks,...incoming].map(block=>[block.hash,block])).values()]
+      .sort((a,b)=>a.daaScore-b.daaScore||a.timestamp-b.timestamp);
+    const newestTimestamp=merged.at(-1)?.timestamp||Date.now();
+    const blocks=merged
+      .filter(block=>block.timestamp>=newestTimestamp-BUFFER_SECONDS*1000)
+      .slice(-MAX_BUFFER_BLOCKS);
+    const nextCursor=incoming.filter(block=>block.color==='blue').at(-1)?.hash
+      ||incoming.at(-1)?.hash
+      ||sharedSnapshot.cursor;
+    return {
+      ok:true,
+      source:provider.id==='nownodes'?'live':'live-fallback',
+      provider:provider.id,
+      mode:'cdn-shared',
+      fetchedAt:new Date().toISOString(),
+      network:sharedSnapshot.network||'kaspa-mainnet',
+      virtualDaaScore:Math.max(Number(sharedSnapshot.virtualDaaScore||0),blocks.at(-1)?.daaScore||0),
+      bufferSeconds:BUFFER_SECONDS,
+      cursor:nextCursor,
+      blocks
+    };
+  }
+
+  const state=await fetchJson(provider,'/info/blockdag');
+  const tipHash=state?.virtualParentHashes?.[0];
+  if(!tipHash)throw new Error('tip_hash_unavailable');
+
+  const tipBlock=await fetchJson(provider,`/blocks/${encodeURIComponent(tipHash)}?includeTransactions=false`);
+  const tipBlueScore=Number(tipBlock?.header?.blueScore||tipBlock?.verboseData?.blueScore||0);
+  if(!tipBlueScore)throw new Error('blue_score_unavailable');
+
+  const anchorBlueScore=Math.max(0,tipBlueScore-(BUFFER_SECONDS*BPS+240));
+  const anchors=await fetchJson(provider,`/blocks-from-bluescore?blueScore=${anchorBlueScore}&includeTransactions=false`);
+  const anchorHash=extractAnchorHash(anchors);
+  if(!anchorHash)throw new Error('anchor_hash_unavailable');
+
+  const recent=await fetchJson(provider,`/blocks?lowHash=${encodeURIComponent(anchorHash)}&includeBlocks=true&includeTransactions=true`);
+  const rawBlocks=Array.isArray(recent)?recent:recent?.blocks||[];
+  const normalized=rawBlocks.map(normalizeBlock)
+    .filter(block=>block.hash&&block.daaScore>0)
+    .sort((a,b)=>a.daaScore-b.daaScore||a.timestamp-b.timestamp);
+  const newestTimestamp=normalized.at(-1)?.timestamp||Date.now();
+  const blocks=normalized
+    .filter(block=>block.timestamp>=newestTimestamp-BUFFER_SECONDS*1000)
+    .slice(-MAX_BUFFER_BLOCKS);
+  if(!blocks.length)throw new Error('blocks_unavailable');
+  const cursor=blocks.filter(block=>block.color==='blue').at(-1)?.hash
+    ||state?.virtualParentHashes?.[0]
+    ||blocks.at(-1)?.hash;
+
+  return {
+    ok:true,
+    source:provider.id==='nownodes'?'live':'live-fallback',
+    provider:provider.id,
+    mode:'cdn-shared',
+    fetchedAt:new Date().toISOString(),
+    network:state?.networkName||'kaspa-mainnet',
+    virtualDaaScore:Number(state?.virtualDaaScore||0),
+    bufferSeconds:BUFFER_SECONDS,
+    cursor,
+    blocks
+  };
 }
 
 function normalizeBlock(raw){
@@ -106,84 +192,17 @@ export async function GET(request){
   const limited=enforceRateLimit(request,'blockdag',30);
   if(limited)return limited;
 
-  try{
-    const apiKey=process.env.NOWNODES_API_KEY;
-    if(!apiKey)throw new Error('api_key_missing');
-
-    // After the first bootstrap, a warm Vercel function only requests blocks
-    // newer than the shared cursor. The public URL never contains a viewer-
-    // specific cursor, so Vercel CDN serves the same JSON to everybody.
-    if(sharedSnapshot?.cursor){
-      const recent=await fetchJson(`/blocks?lowHash=${encodeURIComponent(sharedSnapshot.cursor)}&includeBlocks=true&includeTransactions=true`,apiKey);
-      const rawBlocks=Array.isArray(recent)?recent:recent?.blocks||[];
-      const incoming=rawBlocks.map(normalizeBlock)
-        .filter(block=>block.hash&&block.hash!==sharedSnapshot.cursor&&block.daaScore>0);
-      const merged=[...new Map([...sharedSnapshot.blocks,...incoming].map(block=>[block.hash,block])).values()]
-        .sort((a,b)=>a.daaScore-b.daaScore||a.timestamp-b.timestamp);
-      const newestTimestamp=merged.at(-1)?.timestamp||Date.now();
-      const blocks=merged
-        .filter(block=>block.timestamp>=newestTimestamp-BUFFER_SECONDS*1000)
-        .slice(-MAX_BUFFER_BLOCKS);
-      const nextCursor=incoming.filter(block=>block.color==='blue').at(-1)?.hash
-        ||incoming.at(-1)?.hash
-        ||sharedSnapshot.cursor;
-      sharedSnapshot={
-        ok:true,
-        source:'live',
-        mode:'cdn-shared',
-        fetchedAt:new Date().toISOString(),
-        network:sharedSnapshot.network||'kaspa-mainnet',
-        virtualDaaScore:Math.max(Number(sharedSnapshot.virtualDaaScore||0),blocks.at(-1)?.daaScore||0),
-        bufferSeconds:BUFFER_SECONDS,
-        cursor:nextCursor,
-        blocks
-      };
+  const failures=[];
+  for(const provider of providerList()){
+    try{
+      sharedSnapshot=await loadSnapshot(provider);
       return NextResponse.json(sharedSnapshot,{headers:CACHE_HEADERS});
+    }catch(error){
+      const reason=error?.message||String(error);
+      failures.push(`${provider.id}:${reason}`);
+      console.warn('BlockDAG provider failed',provider.id,reason);
     }
-
-    const state=await fetchJson('/info/blockdag',apiKey);
-    const tipHash=state?.virtualParentHashes?.[0];
-    if(!tipHash)throw new Error('tip_hash_unavailable');
-
-    const tipBlock=await fetchJson(`/blocks/${encodeURIComponent(tipHash)}?includeTransactions=false`,apiKey);
-    const tipBlueScore=Number(tipBlock?.header?.blueScore||tipBlock?.verboseData?.blueScore||0);
-    if(!tipBlueScore)throw new Error('blue_score_unavailable');
-
-    // 10 BPS mainnet: keep a little more than 120 seconds so the client can
-    // broadcast 60 seconds behind the tip without exhausting its queue.
-    const anchorBlueScore=Math.max(0,tipBlueScore-(BUFFER_SECONDS*BPS+240));
-    const anchors=await fetchJson(`/blocks-from-bluescore?blueScore=${anchorBlueScore}&includeTransactions=false`,apiKey);
-    const anchorHash=extractAnchorHash(anchors);
-    if(!anchorHash)throw new Error('anchor_hash_unavailable');
-
-    const recent=await fetchJson(`/blocks?lowHash=${encodeURIComponent(anchorHash)}&includeBlocks=true&includeTransactions=true`,apiKey);
-    const rawBlocks=Array.isArray(recent)?recent:recent?.blocks||[];
-    const normalized=rawBlocks.map(normalizeBlock)
-      .filter(block=>block.hash&&block.daaScore>0)
-      .sort((a,b)=>a.daaScore-b.daaScore||a.timestamp-b.timestamp);
-    const newestTimestamp=normalized.at(-1)?.timestamp||Date.now();
-    const blocks=normalized
-      .filter(block=>block.timestamp>=newestTimestamp-BUFFER_SECONDS*1000)
-      .slice(-MAX_BUFFER_BLOCKS);
-    if(!blocks.length)throw new Error('blocks_unavailable');
-    const cursor=blocks.filter(block=>block.color==='blue').at(-1)?.hash
-      ||state?.virtualParentHashes?.[0]
-      ||blocks.at(-1)?.hash;
-
-    sharedSnapshot={
-      ok:true,
-      source:'live',
-      mode:'cdn-shared',
-      fetchedAt:new Date().toISOString(),
-      network:state?.networkName||'kaspa-mainnet',
-      virtualDaaScore:Number(state?.virtualDaaScore||0),
-      bufferSeconds:BUFFER_SECONDS,
-      cursor,
-      blocks
-    };
-    return NextResponse.json(sharedSnapshot,{headers:CACHE_HEADERS});
-  }catch(error){
-    console.error('BlockDAG relay failed',error?.message||String(error));
-    return NextResponse.json({ok:false,source:'unavailable',blocks:[],error:'blockdag_unavailable'},{status:503,headers:ERROR_HEADERS});
   }
+  console.error('BlockDAG relay failed',failures.join(', '));
+  return NextResponse.json({ok:false,source:'unavailable',blocks:[],error:'blockdag_unavailable'},{status:503,headers:ERROR_HEADERS});
 }
