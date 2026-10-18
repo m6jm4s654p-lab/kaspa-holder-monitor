@@ -11,7 +11,7 @@ const blockClass=block=>block.maxTransferKas>=1_000_000?'mega':block.maxTransfer
 const blockSignal=block=>({mega:'MEGA WHALE DETECTED',large:'100K+ FLOW DETECTED',medium:'10K+ FLOW DETECTED',small:'1K+ FLOW DETECTED',normal:'NORMAL ACTIVITY'})[blockClass(block)];
 const PLAYBACK_DELAY_MS=60_000;
 const BUFFER_RETENTION_MS=150_000;
-const CANVAS_BLOCK_LIMIT=120;
+const CANVAS_BLOCK_LIMIT=80;
 
 export default function BlockDAGView(){
  const [data,setData]=useState(null),[buffer,setBuffer]=useState([]),[playbackNow,setPlaybackNow]=useState(()=>Date.now()-PLAYBACK_DELAY_MS),[selected,setSelected]=useState(null),[paused,setPaused]=useState(false),[error,setError]=useState(false),[retryCount,setRetryCount]=useState(0);
