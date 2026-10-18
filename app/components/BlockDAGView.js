@@ -20,9 +20,21 @@ export default function BlockDAGView(){
  useEffect(()=>{if(paused)return;const tick=()=>setPlaybackNow(Date.now()-PLAYBACK_DELAY_MS);tick();const timer=window.setInterval(tick,500);return()=>window.clearInterval(timer)},[paused]);
  const orderedBuffer=useMemo(()=>[...buffer].sort((a,b)=>a.timestamp-b.timestamp||a.daaScore-b.daaScore),[buffer]);
  const newestTimestamp=orderedBuffer.at(-1)?.timestamp??0;
- const effectivePlaybackNow=orderedBuffer.some(block=>block.timestamp<=playbackNow)?playbackNow:newestTimestamp;
+ // A public fallback can trail wall-clock time by more than the intended
+ // 60-second delay. Never place the playback cursor ahead of the newest block
+ // we actually have, otherwise the initial metric window can be empty.
+ const effectivePlaybackNow=newestTimestamp?Math.min(playbackNow,newestTimestamp):playbackNow;
  const broadcastBlocks=useMemo(()=>orderedBuffer.filter(block=>block.timestamp<=effectivePlaybackNow),[orderedBuffer,effectivePlaybackNow]);
- const metricBlocks=useMemo(()=>broadcastBlocks.filter(block=>block.timestamp>effectivePlaybackNow-PLAYBACK_DELAY_MS),[broadcastBlocks,effectivePlaybackNow]);
+ const metricBlocks=useMemo(()=>{
+  const delayedWindow=broadcastBlocks.filter(block=>block.timestamp>effectivePlaybackNow-PLAYBACK_DELAY_MS);
+  if(delayedWindow.length)return delayedWindow;
+  // On the first response the 60-second delayed window can fall between the
+  // timestamps supplied by the upstream snapshot. Show the latest available
+  // 60-second slice instead of leaving every headline metric empty.
+  const available=broadcastBlocks.length?broadcastBlocks:orderedBuffer;
+  const anchor=available.at(-1)?.timestamp??0;
+  return anchor?available.filter(block=>block.timestamp>anchor-PLAYBACK_DELAY_MS):[];
+ },[broadcastBlocks,effectivePlaybackNow,orderedBuffer]);
  const canvasBlocks=useMemo(()=>broadcastBlocks.slice(-CANVAS_BLOCK_LIMIT),[broadcastBlocks]);
  const bufferAheadSeconds=newestTimestamp?Math.max(0,Math.round((newestTimestamp-effectivePlaybackNow)/1000)):0;
  useEffect(()=>{if(!canvasBlocks.length)return;setSelected(current=>canvasBlocks.find(block=>block.hash===current?.hash)??canvasBlocks.at(-1)??null)},[canvasBlocks]);
