@@ -4,6 +4,9 @@ import { useEffect, useMemo, useRef } from "react";
 
 
 const CYCLE_SECONDS = 53;
+// Slow the entire visual sequence without sacrificing display-synced frames.
+// 0.55 turns the 53-second camera route into roughly a 96-second route.
+const MOTION_SPEED = 0.55;
 const REGION_LENGTH = 140;
 const clamp01 = (value) => Math.max(0, Math.min(1, value));
 const smooth = (value) => {
@@ -185,7 +188,8 @@ export default function InfiniteFlightCanvas({ blocks, selected, paused, onSelec
 
       if (flightStartRef.current == null) flightStartRef.current = time;
       const activePauseMs = pauseStartedAtRef.current == null ? 0 : Math.max(0, time - pauseStartedAtRef.current);
-      const elapsed = Math.max(0, (time - flightStartRef.current - totalPausedMsRef.current - activePauseMs) / 1000);
+      const elapsed = Math.max(0, (time - flightStartRef.current - totalPausedMsRef.current - activePauseMs) / 1000) * MOTION_SPEED;
+      const motionTime = elapsed * 1000;
       const cycle = Math.floor(elapsed / CYCLE_SECONDS);
       const seconds = elapsed % CYCLE_SECONDS;
       const phase = flightPhase(seconds);
@@ -274,7 +278,7 @@ export default function InfiniteFlightCanvas({ blocks, selected, paused, onSelec
       if (beaconTemplate) {
         const zoneShift = REGION_LENGTH * smooth((seconds - 38) / 8);
         beaconWorld = { x: beaconTemplate.x, y: beaconTemplate.y, z: regionBase + beaconTemplate.localZ + zoneShift };
-        beaconBlend = smooth((time - beaconRef.current.startedAt) / 18_000);
+        beaconBlend = smooth(Math.max(0, time - beaconRef.current.startedAt) * MOTION_SPEED / 18_000);
         camera = {
           x: lerp(camera.x, beaconWorld.x, beaconBlend * .12),
           y: lerp(camera.y, beaconWorld.y, beaconBlend * .08),
@@ -506,7 +510,7 @@ export default function InfiniteFlightCanvas({ blocks, selected, paused, onSelec
           const packetCount = 1;
           for (let packetIndex = 0; packetIndex < packetCount; packetIndex += 1) {
             if (mobile && !near && edgeIndex % 3 !== 0) continue;
-            const progress = ((time / (level === "normal" ? 1500 : 1120) + edgeIndex * .173 + packetIndex / packetCount) % 1) * edge.birth;
+            const progress = ((motionTime / (level === "normal" ? 1500 : 1120) + edgeIndex * .173 + packetIndex / packetCount) % 1) * edge.birth;
             const packet = projectEdgePoint(edgeWorldPoint(edge, progress));
             if (!packet) continue;
             ctx.save();
@@ -527,7 +531,7 @@ export default function InfiniteFlightCanvas({ blocks, selected, paused, onSelec
       projected.forEach((node) => {
         const level = blockLevel(node.block);
         const color = level === "mega" ? "#b36cff" : level === "large" ? "#ff4d64" : level === "medium" ? "#ff9f43" : level === "small" ? "#ffd84d" : "#49e7d5";
-        const processProgress = (time / 1180 + hashUnit(node.block.hash, 73) * 2.7) % 1;
+        const processProgress = (motionTime / 1180 + hashUnit(node.block.hash, 73) * 2.7) % 1;
         const isProcessing = node.zone === cycle && node.birth > .82 && node.lod !== "far" && processProgress < .32;
         if (isProcessing) parallelCount += 1;
         const current = positions.get(node.block.hash);
@@ -576,7 +580,7 @@ export default function InfiniteFlightCanvas({ blocks, selected, paused, onSelec
       if (frontierWorld) {
         const frontier = project(frontierWorld);
         if (frontier && frontier.x > 20 && frontier.x < rect.width - 20 && frontier.y > 20 && frontier.y < rect.height - 20) {
-          const pulse = (time / 1050) % 1;
+          const pulse = (motionTime / 1050) % 1;
           ctx.save();
           ctx.strokeStyle = "#dcfffb";
           ctx.shadowColor = "#49e7d5";
@@ -604,7 +608,7 @@ export default function InfiniteFlightCanvas({ blocks, selected, paused, onSelec
         const parent = byZone.get(zone)?.get(hash);
         if (!parent || parent.zone !== cycle) return;
         branchPointCount += 1;
-        const pulse = (time / 1320 + hashUnit(hash, 83)) % 1;
+        const pulse = (motionTime / 1320 + hashUnit(hash, 83)) % 1;
         ctx.strokeStyle = "#7ffff2";
         ctx.globalAlpha = .42 * (1 - pulse);
         ctx.lineWidth = .9;
@@ -615,7 +619,7 @@ export default function InfiniteFlightCanvas({ blocks, selected, paused, onSelec
       if (beaconWorld) {
         const beacon = project(beaconWorld);
         if (beacon && beacon.x > 18 && beacon.x < rect.width - 18 && beacon.y > 18 && beacon.y < rect.height - 18) {
-          const pulse = (time / 1500) % 1;
+          const pulse = (motionTime / 1500) % 1;
           ctx.save();
           ctx.strokeStyle = "#b36cff";
           ctx.shadowColor = "#b36cff";
@@ -638,7 +642,7 @@ export default function InfiniteFlightCanvas({ blocks, selected, paused, onSelec
         ctx.globalAlpha = .82;
         ctx.lineWidth = 1.3;
         ctx.setLineDash([3, 4]);
-        ctx.beginPath(); ctx.arc(selectedPoint.x, selectedPoint.y, selectedPoint.radius + 9 + Math.sin(time / 260) * 2, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(selectedPoint.x, selectedPoint.y, selectedPoint.radius + 9 + Math.sin(motionTime / 260) * 2, 0, Math.PI * 2); ctx.stroke();
         ctx.restore();
       }
 
