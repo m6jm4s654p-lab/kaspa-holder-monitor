@@ -124,7 +124,6 @@ function svgPath(values,x,y){
 }
 
 function MarketChart({candles,prices,volumes,lang,t,displayDays=60}){
- const [hover,setHover]=useState(null);
  const [maVisible,setMaVisible]=useState(()=>Object.fromEntries(MA_CONFIG.map(ma=>[ma.period,true])));
  const W=720,H=244,AX=64,PL=8,PR=4,PT=14,PB=displayDays===30?18:30,VH=48,FUTURE_SLOTS=10;
  const hasCandles=Array.isArray(candles)&&candles.length>=2;
@@ -148,12 +147,10 @@ function MarketChart({candles,prices,volumes,lang,t,displayDays=60}){
  const x=i=>PL+i*candleStep;
  const y=v=>PT+(hi-v)*(plotBottom-PT)/(hi-lo);
  const volVals=visibleVolumes.map(v=>v.value).filter(Number.isFinite),vmax=Math.max(...volVals,1);
- const idx=hover==null?points.length-1:clamp(hover,0,points.length-1),p=points[idx],cx=x(idx);
+ const p=points.at(-1);
  const bodyW=Math.max(1.2,Math.min(7,candleStep*.62));
  const dataWidth=candleIntervals*candleStep;
- const onMove=e=>{const r=e.currentTarget.getBoundingClientRect(),px=((e.touches?.[0]?.clientX??e.clientX)-r.left)/r.width*W;setHover(clamp(Math.round((px-PL)/dataWidth*(points.length-1)),0,points.length-1))};
  const dateFmt=new Intl.DateTimeFormat(LOCALES[lang],{month:'short',day:'numeric'});
- const dtFmt=new Intl.DateTimeFormat(LOCALES[lang],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
  const axis=[hi,(hi+lo)/2,lo];
 
  // Real market_chart line is used only when OHLC is unavailable; never synthetic.
@@ -162,7 +159,7 @@ function MarketChart({candles,prices,volumes,lang,t,displayDays=60}){
   <div className="chartMode"><span className="realDot"/> <b>4H {hasCandles?t.ohlc:t.priceLive}</b><span className="chartRange">{displayDays===30?t.last30:t.last60}</span><em>{t.realData}</em></div>
   <div className="marketViewport">
   <div className="marketCanvas">
-  <svg className="marketChart" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio={displayDays===30?'none':'xMidYMid meet'} onMouseMove={onMove} onMouseLeave={()=>setHover(null)} onTouchStart={onMove} onTouchMove={onMove}>
+  <svg className="marketChart" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio={displayDays===30?'none':'xMidYMid meet'}>
    {[0,.25,.5,.75,1].map((q,i)=>{const yy=PT+q*(plotBottom-PT);return <line key={i} x1={PL} y1={yy} x2={W-PR} y2={yy} className="mgrid"/>})}
    {visibleVolumes.slice(-points.length).map((v,i)=>{const bh=(v.value/vmax)*(VH-7),xx=x(i);return <rect key={v.ts||i} x={xx-.8} y={H-PB-bh} width="1.6" height={bh} className="volbar"/>})}
    {hasCandles ? points.map((q,i)=>{const xx=x(i),up=q.close>=q.open,top=y(Math.max(q.open,q.close)),bottom=y(Math.min(q.open,q.close)),bh=Math.max(1,bottom-top);return <g key={q.ts} className={up?'candleUp':'candleDown'}><line x1={xx} y1={y(q.high)} x2={xx} y2={y(q.low)} className="wick"/><rect x={xx-bodyW/2} y={top} width={bodyW} height={bh} rx=".6" className="body"/></g>}) :
@@ -170,8 +167,6 @@ function MarketChart({candles,prices,volumes,lang,t,displayDays=60}){
    {maLines.map(ma=>ma.available&&maVisible[ma.period]?<path key={ma.period} d={svgPath(ma.values,x,y)} fill="none" stroke={ma.color} className="maLine"/>:null)}
    <line x1={x(points.length-1)} y1={y(points.at(-1).close)} x2={W-PR} y2={y(points.at(-1).close)} className="currentPriceGuide"/>
    {[0,Math.floor((points.length-1)/2),points.length-1].map((i,k)=><text key={k} x={x(i)} y={H-(displayDays===30?4:7)} textAnchor={k===0?'start':k===2?'end':'middle'} className="axisText">{dateFmt.format(new Date(points[i].ts))}</text>)}
-   <line x1={cx} y1={PT} x2={cx} y2={H-PB} className="cross"/>
-   <circle cx={cx} cy={y(p.close)} r="3.5" className="closeDot"/>
   </svg>
   </div>
   <svg className="fixedPriceAxis" viewBox={`0 0 ${AX} ${H}`} preserveAspectRatio={displayDays===30?'none':'xMidYMid meet'} aria-label={t.priceScale}>
@@ -179,11 +174,6 @@ function MarketChart({candles,prices,volumes,lang,t,displayDays=60}){
    <rect x="2" y={clamp(y(p.close)-10,2,plotBottom-20)} width={AX-5} height="20" rx="4" className="priceTag"/>
    <text x="6" y={clamp(y(p.close)+4,16,plotBottom-6)} className="priceTagText">${p.close.toFixed(p.close<.1?5:3)}</text>
   </svg>
-  </div>
-  <div className="ohlcTooltip">
-   <div className="ohlcTime">{dtFmt.format(new Date(p.ts))}</div>
-   <span>O <b>${p.open.toFixed(5)}</b></span><span>H <b>${p.high.toFixed(5)}</b></span>
-   <span>L <b>${p.low.toFixed(5)}</b></span><span>C <b>${p.close.toFixed(5)}</b></span>
   </div>
   <div className="maLegend" aria-label={t.movingAverages}>
    {maLines.map(ma=><button key={ma.period} type="button" className={`${maVisible[ma.period]?'active':''} ${ma.available?'':'unavailable'}`} onClick={()=>ma.available&&setMaVisible(v=>({...v,[ma.period]:!v[ma.period]}))} aria-pressed={maVisible[ma.period]&&ma.available} disabled={!ma.available}><i style={{background:ma.color}}/><b>{ma.period}MA</b>{!ma.available&&<span>{t.insufficient}</span>}</button>)}
@@ -242,7 +232,7 @@ export default function Dashboard(){
  return <main className="shell">
   <header className="topbar"><div className="brandBlock"><img src="/kaspa-logo.svg" className="kaspaMark" alt="Kaspa"/><div><div className="kaspaWord">KASPA</div><div className="monitorWord">HOLDER MONITOR</div></div></div><div className="headerTools"><span className="versionBadge">v2.4.1</span><select className="lang" value={lang} onChange={changeLang} aria-label="Language"><option value="ja">日本語</option><option value="en">English</option><option value="ko">한국어</option><option value="zh">中文</option><option value="es">Español</option></select><img className="headerTechbitLogo" src="/techbit-logo.png" alt="TechBit · Crypto × Data × Future"/></div></header>
   <section className="hero"><div className="live"><i/> {t.live}</div><div className="heroTitleRow"><h1>{t.tag}</h1><a className="heroDagEntry" href="/blockdag"><i/>LIVE DAG</a></div><p>Small Steps. A Bigger KASPA.</p></section>
-  <section className="card priceCard"><div className="row"><div><div className="eyebrow">{t.price} (USD)</div><div className="price">{price?.usd?`$${price.usd.toFixed(price.usd<.1?5:3)}`:'—'}</div><div className={price?.change24h>=0?'up':'down'}>{price?.change24h!=null?pct(price.change24h):'—'} <span>24h</span></div></div><div className="fixedTimeframe"><b>4H</b><span>{marketDays===30?t.view30:t.view60}</span></div></div><MarketChart candles={allCandles} prices={allPrices} volumes={allVolumes} lang={lang} t={t} displayDays={marketDays}/><div className="marketStats"><div><span>{marketDays===30?t.change30Market:t.change60}</span><b className={periodChange>=0?'up':'down'}>{pct(periodChange)}</b></div><div><span>{t.high}</span><b>{periodHigh?`$${periodHigh.toFixed(5)}`:'—'}</b></div><div><span>{t.low}</span><b>{periodLow?`$${periodLow.toFixed(5)}`:'—'}</b></div><div><span>{t.volume}</span><b>{compactUsd(latestVol)}</b></div></div><div className="priceSource"><span className="realDot"/> {t.priceLive} · 4H OHLC · {t.realData}</div><div className={`updateStatus ${updateDelayed?'delayed':''}`}><span>{t.priceStatus} {timeFmt(priceUpdatedAt)}</span><span>{t.chartStatus} {timeFmt(chartUpdatedAt)}</span><b>{updateDelayed?t.updateDelayed:t.autoRefresh}</b></div></section>
+  <section className="card priceCard"><div className="row"><div><div className="eyebrow">{t.price} (USD)</div><div className="price">{price?.usd?`$${price.usd.toFixed(price.usd<.1?5:3)}`:'—'}</div><div className={price?.change24h>=0?'up':'down'}>{price?.change24h!=null?pct(price.change24h):'—'} <span>24h</span></div></div><div className="fixedTimeframe"><b>4H</b><span>{marketDays===30?t.view30:t.view60}</span></div></div><MarketChart candles={allCandles} prices={allPrices} volumes={allVolumes} lang={lang} t={t} displayDays={marketDays}/><div className="marketStats"><div><span>{marketDays===30?t.change30Market:t.change60}</span><b className={periodChange>=0?'up':'down'}>{pct(periodChange)}</b></div><div><span>{t.volume}</span><b>{compactUsd(latestVol)}</b></div></div><div className="priceSource"><span className="realDot"/> {t.priceLive} · 4H OHLC · {t.realData}</div><div className={`updateStatus ${updateDelayed?'delayed':''}`}><span>{t.priceStatus} {timeFmt(priceUpdatedAt)}</span><span>{t.chartStatus} {timeFmt(chartUpdatedAt)}</span><b>{updateDelayed?t.updateDelayed:t.autoRefresh}</b></div></section>
   <section className={`card pulseCard ${pulse.tone}`}>
    <div className="pulseHead"><div><div className="eyebrow">{pulseText.title}</div><b>{pulse.label}</b></div><span>4H DATA</span></div>
    <p className="pulseSummary">{pulse.summary}</p>
