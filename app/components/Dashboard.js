@@ -15,6 +15,11 @@ Object.assign(T.en,{last60:'Last 60 days',view60:'60-day view',change60:'60D cha
 Object.assign(T.ko,{last60:'최근 60일',view60:'60일 고정',change60:'60일 등락률',priceStatus:'가격',chartStatus:'차트',updateDelayed:'업데이트 지연',autoRefresh:'자동 업데이트',perpetual:'Bybit · KASUSDT 무기한',circulating:'KAS 유통 중',heldTop100:'상위 100개 주소 보유',lessConcentrated:'집중도 하락',moreConcentrated:'집중도 상승',tier:'보유량',noHistoryYet:'아직 기록 없음',priceScale:'가격 눈금',movingAverages:'이동평균선',liveUnavailable:'실시간 총계를 가져올 수 없음'});
 Object.assign(T.zh,{last60:'最近60天',view60:'固定60天',change60:'60日涨跌幅',priceStatus:'价格',chartStatus:'图表',updateDelayed:'更新延迟',autoRefresh:'自动更新',perpetual:'Bybit · KASUSDT 永续',circulating:'KAS 流通中',heldTop100:'由前100地址持有',lessConcentrated:'集中度下降',moreConcentrated:'集中度上升',tier:'持币量',noHistoryYet:'暂无历史数据',priceScale:'价格刻度',movingAverages:'移动平均线',liveUnavailable:'无法获取实时总数'});
 Object.assign(T.es,{last60:'Últimos 60 días',view60:'Vista de 60 días',change60:'Cambio 60D',priceStatus:'Precio',chartStatus:'Gráfico',updateDelayed:'Actualización retrasada',autoRefresh:'Actualización automática',perpetual:'Bybit · KASUSDT perpetuo',circulating:'KAS en circulación',heldTop100:'en manos del Top 100',lessConcentrated:'Menos concentrado',moreConcentrated:'Más concentrado',tier:'Nivel',noHistoryYet:'SIN HISTORIAL',priceScale:'Escala de precios',movingAverages:'Medias móviles',liveUnavailable:'Total en vivo no disponible'});
+Object.assign(T.ja,{compareScale:'価格と100K+を個別スケールで表示'});
+Object.assign(T.en,{compareScale:'Price and 100K+ use independent scales'});
+Object.assign(T.ko,{compareScale:'가격과 100K+를 개별 축척으로 표시'});
+Object.assign(T.zh,{compareScale:'价格与100K+使用独立刻度'});
+Object.assign(T.es,{compareScale:'Precio y 100K+ usan escalas independientes'});
 Object.assign(T.ja,{minAddressBalance:'残高 0.01 KAS以上'});
 Object.assign(T.en,{minAddressBalance:'Balance ≥ 0.01 KAS'});
 Object.assign(T.ko,{minAddressBalance:'잔액 0.01 KAS 이상'});
@@ -181,7 +186,15 @@ function MarketChart({candles,prices,volumes,lang,t,displayDays=60}){
  </div>
 }
 function LineChart({values,t}){const W=420,H=130,p=8,all=values.filter(Number.isFinite);if(all.length<2)return <div className="emptyChart">{t.noHistoryYet}</div>;const min=Math.min(...all),max=Math.max(...all),range=max-min||1,path=values.map((v,i)=>`${i?'L':'M'}${p+i*(W-2*p)/(values.length-1)},${H-p-(v-min)*(H-2*p)/range}`).join(' ');return <svg className="chart" viewBox={`0 0 ${W} ${H}`}><g className="gridLines"><line x1="0" y1="32" x2={W} y2="32"/><line x1="0" y1="65" x2={W} y2="65"/><line x1="0" y1="98" x2={W} y2="98"/></g><path d={path} fill="none" stroke="#49eac1" strokeWidth="3" strokeLinecap="round"/></svg>}
-function NormalizedCompare({holderValues,priceValues,t}){if(holderValues.length<2||priceValues.length<2)return <div className="emptyChart">{t.noHistoryYet}</div>;const n=Math.min(holderValues.length,priceValues.length),h=holderValues.slice(-n),p=priceValues.slice(-n),hn=h.map(v=>(v/h[0]-1)*100),pn=p.map(v=>(v/p[0]-1)*100),all=[...hn,...pn],min=Math.min(...all,0),max=Math.max(...all,0),range=max-min||1,W=420,H=145,px=8;const path=d=>d.map((v,i)=>`${i?'L':'M'}${px+i*(W-2*px)/(d.length-1)},${H-px-(v-min)*(H-2*px)/range}`).join(' '),zeroY=H-px-(0-min)*(H-2*px)/range;return <><svg className="chart compareChart" viewBox={`0 0 ${W} ${H}`}><line x1="0" y1={zeroY} x2={W} y2={zeroY} className="zeroLine"/><path d={path(pn)} fill="none" stroke="#f3faf8" strokeWidth="2.2"/><path d={path(hn)} fill="none" stroke="#49eac1" strokeWidth="3"/></svg><div className="legend"><span><i className="legendPrice"/> {t.priceLegend} {pct(pn.at(-1))}</span><span><i className="legendHolder"/> {t.holderLegend} {pct(hn.at(-1))}</span></div><div className="normalizedNote">{t.normalized}</div></>}
+function NormalizedCompare({holderValues,priceValues,t}){
+ if(holderValues.length<2||priceValues.length<2)return <div className="emptyChart">{t.noHistoryYet}</div>;
+ const n=Math.min(holderValues.length,priceValues.length),h=holderValues.slice(-n),p=priceValues.slice(-n);
+ const hMin=Math.min(...h),hMax=Math.max(...h),hRange=hMax-hMin||1;
+ const pMin=Math.min(...p),pMax=Math.max(...p),pRange=pMax-pMin||1;
+ const W=420,H=145,px=8;
+ const path=(values,min,range)=>values.map((v,i)=>`${i?'L':'M'}${px+i*(W-2*px)/(values.length-1)},${H-px-(v-min)*(H-2*px)/range}`).join(' ');
+ const holderChange=(h.at(-1)/h[0]-1)*100,priceChange=(p.at(-1)/p[0]-1)*100;
+ return <><svg className="chart compareChart" viewBox={`0 0 ${W} ${H}`}><path d={path(p,pMin,pRange)} fill="none" stroke="#f3faf8" strokeWidth="2.2"/><path d={path(h,hMin,hRange)} fill="none" stroke="#49eac1" strokeWidth="3"/></svg><div className="legend"><span><i className="legendPrice"/> {t.priceLegend} {pct(priceChange)}</span><span><i className="legendHolder"/> {t.holderLegend} {pct(holderChange)}</span></div><div className="normalizedNote">{t.compareScale}</div></>}
 function BarChart({values,t}){const finite=values.filter(Number.isFinite);if(finite.length<1)return <div className="emptyChart">{t.noHistoryYet}</div>;const W=420,H=120,mid=60,max=Math.max(...finite.map(v=>Math.abs(v)),1);return <svg className="chart" viewBox={`0 0 ${W} ${H}`}><line x1="0" y1={mid} x2={W} y2={mid} stroke="#ffffff22"/>{values.map((v,i)=>{if(!Number.isFinite(v))return null;const bw=W/values.length*.55,scaled=Math.abs(v)/max*52,h=v===0?2:scaled,x=i*W/values.length+(W/values.length-bw)/2,y=v>0?mid-h:v<0?mid:mid-1;return <rect key={i} x={x} y={y} width={bw} height={h} rx="1.5" fill={v>=0?'#49eac1':'#ff6b6b'}/>})}</svg>}
 
 export default function Dashboard(){
